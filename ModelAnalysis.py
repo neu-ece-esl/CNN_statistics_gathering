@@ -44,14 +44,16 @@ class ModelStatCollector:
         self.model_stats = {}
         self.hooks = []
 
-    def collect_stats_from_model(self, model, input_batch):
-        self.__attach_collection_hooks_to_model(model)
+    @ classmethod 
+    def collect_stats_from_model(cls, model, input_batch):
+        collector = cls()
+        collector.__attach_collection_hooks_to_model(model)
         model.eval()
         with torch.no_grad():
             model(input_batch)
-        self.__detach_stats_collection_hooks()
-        collected_stats = deepcopy(self.model_stats)
-        self.__reset()
+        collector.__detach_stats_collection_hooks()
+        collected_stats = deepcopy(collector.model_stats)
+        collector.__reset()
         return collected_stats
 
 class ModelStatAnalyser:
@@ -125,7 +127,6 @@ class ModelStatAnalyser:
 
     @ classmethod 
     def get_models_stats_dict(cls, model_dict, input_batch, ssd_input_batch = None):
-        collector = ModelStatCollector()
         stats_dict = {}
         raw_stats_dict = {}
         if torch.cuda.is_available():
@@ -136,9 +137,9 @@ class ModelStatAnalyser:
             print('Analysing {}'.format(model_name))
             model.to('cuda')
             if model_name == 'ssd' and ssd_input_batch is not None:
-                model_stats = collector.collect_stats_from_model(model, ssd_input_batch)
+                model_stats = ModelStatCollector.collect_stats_from_model(model, ssd_input_batch)
             else:
-                model_stats = collector.collect_stats_from_model(model, input_batch)
+                model_stats = ModelStatCollector.collect_stats_from_model(model, input_batch)
                 
             model.to('cpu')
             raw_stats_dict[model_name] = model_stats
