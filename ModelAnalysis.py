@@ -5,8 +5,6 @@ from dataclasses import dataclass
 from typing import Tuple, List
 from copy import deepcopy
 from math import prod
-from sys import version
-version
 
 @dataclass
 class LayerDimensions:
@@ -154,7 +152,7 @@ class ModelStatAnalyser:
 class ModelStatsAggregator:
     
     @ classmethod
-    def get_aggregate_kernel_stats(cls, stats_dict):
+    def get_aggregate_kernel_stats_as_percentages(cls, stats_dict):
         aggregate_kernel_stats = Counter()
         for model, stats in stats_dict.items():
             aggregate_kernel_stats += stats['kernel']
@@ -164,22 +162,23 @@ class ModelStatsAggregator:
         return aggregate_kernel_stats_percentages
 
     @ classmethod
-    def get_aggregate_stride_stats(cls, stats_dict):
+    def get_aggregate_stride_stats_per_kernel(cls, stats_dict):
         aggregate_stride_stats = {}
         for model, stats in stats_dict.items():
             for kernel, counter in stats['stride'].items():
                 if kernel not in aggregate_stride_stats:
                     aggregate_stride_stats[kernel] = Counter()
                 aggregate_stride_stats[kernel] += counter
+        return aggregate_stride_stats
     
     @ classmethod
     def get_stride_stats_per_kernel_as_percentages(cls, stats_dict):
-        aggregate_stride_stats = cls.get_aggregate_stride_stats(stats_dict)
+        aggregate_stride_stats = cls.get_aggregate_stride_stats_per_kernel(stats_dict)
         aggregate_stride_stats_percentages = {}
         for ksize, stride_counter in aggregate_stride_stats.items():
             total_kernels = sum(stride_counter.values())
             aggregate_stride_stats_percentages[ksize] = {stride: count/total_kernels for stride, count in dict(stride_counter).items()}
-        aggregate_stride_stats_percentages
+        return aggregate_stride_stats_percentages
     
     @ classmethod
     def get_aggregate_in_channel_stats_per_kernel(cls, stats_dict):
@@ -207,7 +206,7 @@ class ModelStatsAggregator:
                     cross_kernel_aggregate_channel[channel_size] = 0
                 cross_kernel_aggregate_channel[channel_size] += count
         cross_kernel_aggregate_channel = {k: v for k,v in sorted(cross_kernel_aggregate_channel.items(), key=lambda item: item[1], reverse=True)}
-        cross_kernel_aggregate_channel
+        return cross_kernel_aggregate_channel
         
     @ classmethod
     def get_aggregate_filter_stats_per_kernel(cls, stats_dict):
@@ -223,4 +222,17 @@ class ModelStatsAggregator:
         for kernel, channel_dict in aggregate_filter_stats.items():
             channel_dict = {k: v for k, v in sorted(channel_dict.items(), key=lambda item: item[1], reverse=True)}
             aggregate_filter_stats[kernel] = channel_dict
-        aggregate_filter_stats
+        return aggregate_filter_stats
+    
+    @ classmethod
+    def get_aggregate_filter_stats(cls , stats_dict):
+        aggregate_filter_stats = cls.get_aggregate_filter_stats_per_kernel(stats_dict)
+        cross_kernel_aggregate_channel = {}
+        for filter_dicts in aggregate_filter_stats.values():
+            for filter_size, count in filter_dicts.items():
+                if filter_size not in cross_kernel_aggregate_channel:
+                    cross_kernel_aggregate_channel[filter_size] = 0
+                cross_kernel_aggregate_channel[filter_size] += count
+        cross_kernel_aggregate_filters = {k: v for k,v in sorted(cross_kernel_aggregate_channel.items(), key=lambda item: item[1], reverse=True)}
+        return cross_kernel_aggregate_filters
+        
