@@ -1,0 +1,4 @@
+{
+    "jupyter.jupyterServerType": "local",
+    "python.analysis.extraPaths": ["./ModelAnalysis.py"]
+}
