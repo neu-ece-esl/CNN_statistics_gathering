@@ -22,6 +22,7 @@ seaborn = "^0.11.2"
 thop = "^0.0.31"
 scikit-image = "^0.18.3"
 scikit-learn = "^0.24.2"
+myhdl = "^0.11"
 
 [tool.poetry.dev-dependencies]
 
