@@ -110,6 +110,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
+!.venv/lib/python3.9/site-packages/islpy-2021.1-py3.9-linux-x86_64.egg/
 env/
 venv/
 ENV/
