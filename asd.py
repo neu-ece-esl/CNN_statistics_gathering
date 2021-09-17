@@ -62,7 +62,6 @@ class StreamStateControl:
         self._done = val
 
 
-
 @dataclass
 class StreamTemplate:
     _generator_func_def: Generator
@@ -125,7 +124,7 @@ def example_func(c_ub, i_ub, j_ub, pe_channel, pe_group, pe, ifmap_dim, test = 1
     for c in range(c_ub, i_ub, j_ub):
         for i in range(i_ub):
             for j in range(j_ub):
-                if 1 == 1 and 2 == 2 and 7==7 and 4==4:
+                if 1 == 1 and j_ub == 2 and asd==dsa and 4==ass:
                     if 4 == 3:
                         if 3 > a > 4:
                             yield i*ifmap_dim+j+pe_start_index_offset
@@ -152,8 +151,28 @@ class AccessMap:
     in_vector: Tuple[str] = ()
     out_scalar: str = ''
     condition: str = ''
+    condition_with_annotated_parameters: str = ''
     parameter_list: Tuple[str] = ()
+
+class ParamAnnotator(ast.NodeVisitor):
+    def __init__(self) -> None:
+        super().__init__()
+        
+    def visit_Name(self, node: ast.Name) -> Any:
+        node.id = f'{{{node.id}}}'
+        self.generic_visit(node)
+
+class ParamExtractor(ast.NodeVisitor):
     
+    def __init__(self) -> None:
+        self.params = set()
+        super().__init__()
+        
+    def visit_Name(self, node: ast.Name) -> Any:
+        self.params.add(node.id)
+        node.id = f'{{{node.id}}}'
+        self.generic_visit(node)
+
 @dataclass
 class IslIR:
     stream_name: str
@@ -166,9 +185,12 @@ class IslIR:
 
     def parse_access_maps(self):
         for expr in self.yield_expr:
+            access_map = AccessMap( )
+            param_extractor = ParamExtractor()
             for condition in expr[:-1]:
                 fixd = ast.fix_missing_locations(ast.Expression(condition.test))
-                res = compile(fixd, filename='<ast>', mode='eval')
+                param_extractor.visit(fixd)
+                res = astor.to_source(fixd)
                 print(res)
 
 
@@ -196,9 +218,7 @@ class IslIR:
                         raise Exception("Invalid bound argument(s) for loop range")
             else:
                 raise Exception("For loops can only iterate over ranges")
-                        
-                        
-            
+        self.iteration_domain.parameter_list = tuple(set(self.iteration_domain.parameter_list))                        
 
 class StreamTraverser(astor.ExplicitNodeVisitor):
     
@@ -253,11 +273,11 @@ class StreamTraverser(astor.ExplicitNodeVisitor):
                 "Invalid for body, only for loops, if statements, and yield expressions are allowed in a for loop")
 
     def visit_Yield(self, node: ast.Yield, if_chain: Tuple = ()) -> Any:
-        if_chain += (node, )
-        self.isl_ir.yield_expr += (if_chain, )
+        if_chain += (deepcopy(node), )
+        self.isl_ir.yield_expr += deepcopy((if_chain, ))
 
     def visit_If(self, node: ast.If, if_chain = ()) -> Any:
-        if_chain += (node, )
+        if_chain += (deepcopy(node), )
         if len(node.body) > 1 or len(node.orelse) > 1:
             raise Exception("Too many expressions in if/elif/else statement bodies, something fishy is going on....")
         if len(node.body) == 1:
@@ -273,7 +293,7 @@ class StreamTraverser(astor.ExplicitNodeVisitor):
                 raise Exception("Invalid if condition body, only other if statements, and yield expressions are allowed")
         if len(node.orelse) == 1:
             entry = node.orelse[0]
-            if_chain[-1].test = ast.Compare(if_chain[-1].test, [ast.Eq()], [ast.Constant(value=False, kind=None)])
+            if_chain[-1].test = ast.UnaryOp(op = ast.Not(), operand = if_chain[-1].test)
             if isinstance(entry, ast.If):
                 self.visit_If(entry, if_chain)
             elif isinstance(entry, ast.Expr):
