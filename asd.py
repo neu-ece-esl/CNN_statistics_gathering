@@ -14,9 +14,11 @@ import logging
 from sys import version
 import inspect
 from functools import partial
+from pydantic import BaseModel, ValidationError, validator
 # import showast
 import ast
 import astor
+import re
 logging.basicConfig(level=logging.INFO)
 logging.info(version)
 traceSignals.filename = 'Top'
@@ -24,7 +26,7 @@ traceSignals.tracebackup = False
 
 
 @dataclass
-class StreamStateControl:
+class StreamStateController:
     index_generator_fn: Generator
     initial_index_generator_fn: Generator = None
     _done: bool = False
@@ -127,7 +129,7 @@ def example_func(c_ub, i_ub, j_ub, pe_channel, pe_group, pe, ifmap_dim, test=1, 
     for c in range(c_ub, i_ub, j_ub):
         for i in range(i_ub):
             for j in range(j_ub):
-                if 1 == 1 and j_ub == 2 and asd == dsa and 4 == ass:
+                if 1 == 1 and j_ub == 2 and i == j and 4 == ass:
                     if 4 == 3:
                         if 3 > a > 4:
                             yield i*ifmap_dim+j+pe_start_index_offset
@@ -144,10 +146,23 @@ def example_func(c_ub, i_ub, j_ub, pe_channel, pe_group, pe, ifmap_dim, test=1, 
 
 @dataclass
 class IterationDomain:
-    vector: Tuple[str] = ()
+    _vector: Tuple[str] = ()
     bounds: Tuple[Tuple[Union[int, str]]] = (())
     steps: Tuple[Tuple[Union[int, str]]] = ()
     parameters: Tuple[str] = ()
+
+    @property
+    def vector(self):
+        return self._vector
+
+    @vector.setter
+    def vector(self, vector: Tuple):
+        if len(vector) != len(set(vector)):
+            raise ValueError("Found duplicates in For loop iterators")
+        for val in vector:
+            if val == '_':
+                raise ValueError("Anonymous iterators not allowed in for loops")
+        self._vector = vector
 
 
 @dataclass
@@ -158,22 +173,26 @@ class AccessMap:
     condition_with_annotated_parameters: str = ''
     parameters: Tuple[str] = ()
 
+
 @dataclass
 class Invariant:
     name: str = ''
 
+
 class NamedEntityAnnotator(ast.NodeVisitor):
-    def __init__(self) -> None:
+    def __init__(self, _ignore) -> None:
+        self.ignore_list = _ignore
         super().__init__()
 
     def visit_Name(self, node: ast.Name) -> Any:
-        node.id = f'{{{node.id}}}'
+        if node.id not in self.ignore_list:
+            node.id = f'{{{node.id}}}'
         self.generic_visit(node)
 
     @classmethod
-    def annotate(cls, node):
+    def annotate(cls, node, ignore=[]):
         _node = deepcopy(node)
-        annotator = cls()
+        annotator = cls(ignore)
         annotator.visit(_node)
         return _node
 
@@ -198,45 +217,74 @@ class NamedEntityExtractor(ast.NodeVisitor):
 @dataclass
 class StreamTokens:
     name: str = ''
-    args: ast.arguments = None
+    generator_args: ast.arguments = None
     yield_exprs: Tuple[Union[ast.Yield, Tuple[Union[ast.If, ast.Yield]]]] = ()
-    stream_invariant_assignments: Tuple[ast.Assign] = ()
+    invariant_assignments: Tuple[ast.Assign] = ()
     for_loops: Tuple[ast.For] = ()
+
 
 @dataclass
 class IslIR:
     iteration_domain: IterationDomain = IterationDomain()
     access_maps: Tuple[AccessMap] = ()
-    invariants : Tuple[Invariant] = ()
-    
-    def convert_non_isl_symbols_to_isl_equivelent(self, condition):
-        return condition
+    invariants: Tuple[Invariant] = ()
+    arguments: Tuple[str] = ()
 
-    def wrap_ast_entity_with_expr(self, entity):
+
+class StreamParser:
+    
+    symbol_conversion_table = {
+        '==' : '=',
+        '\n' : '',
+        ' +' : ' '
+    }
+
+    @classmethod
+    def parse(cls, tokens: StreamTokens):
+        parser = cls()
+        parser.parse_name(tokens)
+        parser.parse_arguments(tokens)
+        parser.parse_invariants(tokens)
+        parser.parse_iteration_domain(tokens)
+        parser.parse_access_maps(tokens)
+        return parser.ir
+
+    def __init__(self):
+        self.ir = IslIR()
+
+    def convert_non_isl_symbols_to_isl_equivelent(self, expr_str):
+        for symbol, target in StreamParser.symbol_conversion_table.items():
+            expr_str = re.sub(symbol, target, expr_str)
+        return expr_str
+
+    def wrap_with_expr_and_fix_ast_entity(self, entity):
         wrapped_entity = ast.fix_missing_locations(
             ast.Expression(entity))
         return wrapped_entity
 
     def convert_expr_to_str(self, expr):
-        return astor.to_source(expr)
+        expr_str =  astor.to_source(expr)
+        expr_str = self.convert_non_isl_symbols_to_isl_equivelent(expr_str)
+        return expr_str
 
     def convert_access_map_condition_to_expr(self, condition, annotate_params=False):
-        condition_expr = self.wrap_ast_entity_with_expr(condition)
+        condition_expr = self.wrap_with_expr_and_fix_ast_entity(condition)
         if annotate_params:
-            condition_expr = NamedEntityAnnotator.annotate(condition_expr)
+            condition_expr = NamedEntityAnnotator.annotate(
+                condition_expr, ignore=self.ir.iteration_domain.vector)
         return condition_expr
 
-    def parse_name(self, tokens : StreamTokens):
+    def parse_name(self, tokens: StreamTokens):
+        self.ir.name = tokens.name
+
+    def parse_arguments(self, tokens: StreamTokens):
         pass
 
-    def parse_arguments(self, tokens : StreamTokens):
+    def parse_invariants(self, tokens: StreamTokens):
         pass
 
-    def parse_invariants(self, tokens : StreamTokens):
-        pass
-
-    def parse_access_maps(self, tokens : StreamTokens):
-        for expr in self.yield_expr:
+    def parse_access_maps(self, tokens: StreamTokens):
+        for expr in tokens.yield_exprs:
             condition_list = expr[:-1]
             yield_expr = expr[-1]
 
@@ -249,7 +297,7 @@ class IslIR:
                 chain_parameter_set.add(param)
 
             chain_parameter_set = set(
-                [param for param in chain_parameter_set if param not in self.iteration_domain.vector])
+                [param for param in chain_parameter_set if param not in self.ir.iteration_domain.vector])
             # Get condition
             chain_conditions_expr = self.convert_expr_to_str(
                 ast.BoolOp(op=ast.And(), values=[
@@ -267,10 +315,10 @@ class IslIR:
 
             # Get access expression
             yield_expr_with_annotated_params = self.convert_expr_to_str(
-                NamedEntityAnnotator.annotate(yield_expr.value))
+                NamedEntityAnnotator.annotate(yield_expr.value, ignore=self.ir.iteration_domain.vector))
             yield_expr = self.convert_expr_to_str(yield_expr.value)
 
-            self.access_maps += (
+            self.ir.access_maps += (
                 AccessMap(access_expr=yield_expr,
                           access_expr_with_annotated_parameters=yield_expr_with_annotated_params,
                           condition=chain_conditions_expr,
@@ -278,12 +326,14 @@ class IslIR:
                           parameters=chain_parameter_set),
             )
 
-    def parse_iteration_domain(self, tokens : StreamTokens):
-        self.iteration_domain.vector = tuple(
-            [loop.target.id for loop in self.for_loops])
-        for loop in self.for_loops:
+    def parse_iteration_domain(self, tokens: StreamTokens):
+        # Get iteration domain vectors
+        self.ir.iteration_domain.vector = tuple(
+            [loop.target.id for loop in tokens.for_loops])
+
+        for loop in tokens.for_loops:
             if isinstance(loop.iter, ast.Call) and loop.iter.func.id == 'range':
-                self.iteration_domain.parameters += tuple(
+                self.ir.iteration_domain.parameters += tuple(
                     [arg.id for arg in loop.iter.args if isinstance(arg, ast.Name)])
                 bounds = ()
                 for arg in loop.iter.args[:2]:
@@ -294,30 +344,32 @@ class IslIR:
                     except AttributeError:
                         raise Exception(
                             "Invalid bound argument(s) for loop range")
-                self.iteration_domain.bounds += (bounds, )
+                self.ir.iteration_domain.bounds += (bounds, )
                 if len(loop.iter.args) == 3:
                     arg = loop.iter.args[2]
                     try:
-                        self.iteration_domain.steps += (arg.value, )
+                        self.ir.iteration_domain.steps += (arg.value, )
                     except AttributeError:
-                        self.iteration_domain.steps += (arg.id, )
+                        self.ir.iteration_domain.steps += (arg.id, )
                     except AttributeError:
                         raise Exception(
                             "Invalid bound argument(s) for loop range")
             else:
                 raise Exception("For loops can only iterate over ranges")
-        self.iteration_domain.parameters = tuple(
-            set(self.iteration_domain.parameters))
+
+        # filter out duplicate parameters
+        self.ir.iteration_domain.parameters = tuple(
+            set(self.ir.iteration_domain.parameters))
 
 
-class StreamParser(astor.ExplicitNodeVisitor):
+class StreamLexer(astor.ExplicitNodeVisitor):
 
     @classmethod
-    def parse(cls, node):
-        parser = cls()
-        parser.visit(node)
-        parser.prune_orelse()
-        return parser.tokens
+    def lex(cls, node):
+        lexer = cls()
+        lexer.visit(node)
+        lexer.prune_orelse()
+        return lexer.tokens
 
     def __init__(self):
         self.tokens = StreamTokens()
@@ -345,7 +397,7 @@ class StreamParser(astor.ExplicitNodeVisitor):
         start_of_for_loops_idx = 0
         for idx, _node in enumerate(node.body):
             if isinstance(_node, ast.Assign):
-                self.tokens.stream_invariant_assignments += (_node,)
+                self.tokens.invariant_assignments += (_node,)
             elif isinstance(_node, ast.For):
                 start_of_for_loops_idx = idx
                 break
@@ -413,12 +465,14 @@ class StreamParser(astor.ExplicitNodeVisitor):
                 raise Exception(
                     "Invalid if condition body, only other if statements, and yield expressions are allowed")
 
+
 tree = ast.parse(inspect.getsource(inspect.getgeneratorlocals(example_func(
     1, ofmap_dim, ofmap_dim, 0, 0, 0, ifmap_dim, start_time=0))['self']._generator_func_def))
 
 
 # %%
-tokens = StreamParser.parse(tree)
+tokens = StreamLexer.lex(tree)
+ir = StreamParser.parse(tokens)
 # parser.isl_ir.parse_iteration_domain()
 # parser.isl_ir.parse_access_maps()
 print("DONE")
