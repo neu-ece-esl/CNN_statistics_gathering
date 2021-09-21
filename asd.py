@@ -7,7 +7,7 @@ import islpy as isl
 from myhdl import block, delay, always_seq, instance, always, Signal, ResetSignal, traceSignals, now
 from dataclasses import dataclass, field
 from itertools import tee, product
-from typing import Callable, Generator, Dict, List, Tuple, OrderedDict, Optional, Any, Union
+from typing import Callable, Generator, Dict, List, Tuple, OrderedDict, Optional, Any, Union, Set
 from copy import deepcopy
 from abc import ABC, abstractmethod, abstractproperty
 import logging
@@ -149,7 +149,7 @@ class IterationDomain:
     _vector: Tuple[str] = ()
     bounds: Tuple[Tuple[Union[int, str]]] = (())
     steps: Tuple[Tuple[Union[int, str]]] = ()
-    parameters: Tuple[str] = ()
+    parameters: Set[str] = field(default_factory=set)
 
     @property
     def vector(self):
@@ -172,7 +172,7 @@ class AccessMap:
     access_expr_with_annotated_parameters: str = ''
     condition: str = ''
     condition_with_annotated_parameters: str = ''
-    parameters: Tuple[str] = ()
+    parameters: Set[str] = ()
 
 
 @dataclass
@@ -351,8 +351,9 @@ class StreamParser:
 
         for loop in tokens.for_loops:
             if isinstance(loop.iter, ast.Call) and loop.iter.func.id == 'range':
-                self.ir.iteration_domain.parameters += tuple(
-                    [arg.id for arg in loop.iter.args if isinstance(arg, ast.Name)])
+                for arg in loop.iter.args:
+                    if isinstance(arg, ast.Name):
+                        self.ir.iteration_domain.parameters.add(arg.id)
                 bounds = ()
                 for arg in loop.iter.args[:2]:
                     try:
