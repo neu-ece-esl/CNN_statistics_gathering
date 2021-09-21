@@ -122,7 +122,7 @@ channel_chain_length = int(pe_count/pes_per_channel)
 
 # %%
 @stream
-def example_func(c_ub, i_ub, j_ub, pe_channel, pe_group, pe, ifmap_dim, test=1, *args, **kwargs):
+def example_func(c_ub, i_ub, j_ub, pe_channel, pe_group, pe, ifmap_dim):
     # Stream invariants
     pe_start_index_offset = pe_channel*(ifmap_dim**2)+pe_group*ifmap_dim+pe
     # Dynamic computations
@@ -158,10 +158,11 @@ class IterationDomain:
     @vector.setter
     def vector(self, vector: Tuple):
         if len(vector) != len(set(vector)):
-            raise ValueError("Found duplicates in For loop iterators")
+            raise SyntaxError("Found duplicates in For loop iterators")
         for val in vector:
             if val == '_':
-                raise ValueError("Anonymous iterators not allowed in for loops")
+                raise SyntaxError(
+                    "Anonymous iterators not allowed in for loops")
         self._vector = vector
 
 
@@ -181,11 +182,11 @@ class Invariant:
 
 class NamedEntityAnnotator(ast.NodeVisitor):
     def __init__(self, _ignore) -> None:
-        self.ignore_list = _ignore
+        self.ignore = _ignore
         super().__init__()
 
     def visit_Name(self, node: ast.Name) -> Any:
-        if node.id not in self.ignore_list:
+        if node.id not in self.ignore:
             node.id = f'{{{node.id}}}'
         self.generic_visit(node)
 
@@ -199,17 +200,19 @@ class NamedEntityAnnotator(ast.NodeVisitor):
 
 class NamedEntityExtractor(ast.NodeVisitor):
 
-    def __init__(self) -> None:
+    def __init__(self, _ignore) -> None:
         self.entity_set = set()
+        self.ignore = _ignore
         super().__init__()
 
     def visit_Name(self, node: ast.Name) -> Any:
-        self.entity_set.add(node.id)
+        if node.id not in self.ignore:
+            node.id = f'{{{node.id}}}'
         self.generic_visit(node)
 
     @classmethod
-    def extract(cls, node):
-        extractor = cls()
+    def extract(cls, node, ignore=[]):
+        extractor = cls(ignore)
         extractor.visit(node)
         return extractor.entity_set
 
@@ -228,15 +231,15 @@ class IslIR:
     iteration_domain: IterationDomain = IterationDomain()
     access_maps: Tuple[AccessMap] = ()
     invariants: Tuple[Invariant] = ()
-    arguments: Tuple[str] = ()
+    arguments: Dict[str, Union[int, None]] = field(default_factory=dict)
 
 
 class StreamParser:
-    
+
     symbol_conversion_table = {
-        '==' : '=',
-        '\n' : '',
-        ' +' : ' '
+        r'==': '=',
+        r'\n': '',
+        r' +': ' '
     }
 
     @classmethod
@@ -263,7 +266,7 @@ class StreamParser:
         return wrapped_entity
 
     def convert_expr_to_str(self, expr):
-        expr_str =  astor.to_source(expr)
+        expr_str = astor.to_source(expr)
         expr_str = self.convert_non_isl_symbols_to_isl_equivelent(expr_str)
         return expr_str
 
@@ -275,10 +278,28 @@ class StreamParser:
         return condition_expr
 
     def parse_name(self, tokens: StreamTokens):
-        self.ir.name = tokens.name
+        self.ir.name = tokens.name.upper()
 
     def parse_arguments(self, tokens: StreamTokens):
-        pass
+        if tokens.generator_args.vararg is not None:
+            raise SyntaxError("Varargs not allowed in stream template")
+        if tokens.generator_args.kwarg is not None:
+            raise SyntaxError("Kwargs not allowed in stream template")
+
+        num_of_args_with_default_val = len(tokens.generator_args.defaults)
+        if num_of_args_with_default_val != 0:
+            arg_list = tokens.generator_args.args[:(
+                -num_of_args_with_default_val)]
+        else:
+            arg_list = tokens.generator_args.args
+
+        for arg in arg_list:
+            self.ir.arguments[arg.arg] = None
+        for arg, default in zip(reversed(arg_list), reversed(tokens.generator_args.defaults)):
+            if not isinstance(default, ast.Constant) or not isinstance(default.value, int):
+                raise SyntaxError(
+                    f"Stream template arg: {arg.arg} has a non-int default: {default.value}")
+            self.ir.arguments[arg.arg] = default
 
     def parse_invariants(self, tokens: StreamTokens):
         pass
@@ -291,14 +312,11 @@ class StreamParser:
             # Get parameter list
             chain_parameter_set = set()
             for condition in condition_list:
-                for param in NamedEntityExtractor.extract(condition.test):
+                for param in NamedEntityExtractor.extract(condition.test, ignore=self.ir.iteration_domain.vector):
                     chain_parameter_set.add(param)
-            for param in NamedEntityExtractor.extract(yield_expr):
+            for param in NamedEntityExtractor.extract(yield_expr, ignore=self.ir.iteration_domain.vector):
                 chain_parameter_set.add(param)
-
-            chain_parameter_set = set(
-                [param for param in chain_parameter_set if param not in self.ir.iteration_domain.vector])
-            # Get condition
+                # Get condition
             chain_conditions_expr = self.convert_expr_to_str(
                 ast.BoolOp(op=ast.And(), values=[
                     self.convert_access_map_condition_to_expr(condition.test)
@@ -357,10 +375,6 @@ class StreamParser:
             else:
                 raise Exception("For loops can only iterate over ranges")
 
-        # filter out duplicate parameters
-        self.ir.iteration_domain.parameters = tuple(
-            set(self.ir.iteration_domain.parameters))
-
 
 class StreamLexer(astor.ExplicitNodeVisitor):
 
@@ -393,7 +407,7 @@ class StreamLexer(astor.ExplicitNodeVisitor):
         if node.decorator_list[0].id != 'stream':
             raise Exception("Invalid function used for conversion to ISL IR")
         self.tokens.name = node.name
-        self.tokens.stream_args = node.args
+        self.tokens.generator_args = node.args
         start_of_for_loops_idx = 0
         for idx, _node in enumerate(node.body):
             if isinstance(_node, ast.Assign):
