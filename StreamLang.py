@@ -294,7 +294,7 @@ class StreamParser:
             condition_list = expr[:-1]
             yield_expr = expr[-1]
 
-            # Get parameter list
+            # Get parameter list and validate
             chain_parameter_set = set()
             for condition in condition_list:
                 for param in NamedEntityExtractor.extract(condition.test, ignore=self.ir.iteration_domain.vector):
@@ -306,6 +306,7 @@ class StreamParser:
                 if param not in self.ir.arguments and param not in self.ir.invariants:
                     raise SyntaxError(f"Parameter {param} in expression \n\'{astor.to_source(yield_expr.value).strip()}\'\nis not a stream argument nor an invariant")
                 chain_parameter_set.add(param)
+            
             # Get condition
             chain_conditions_expr = self.convert_expr_to_str(
                 ast.BoolOp(op=ast.And(), values=[
@@ -343,6 +344,8 @@ class StreamParser:
             if isinstance(loop.iter, ast.Call) and loop.iter.func.id == 'range':
                 for arg in loop.iter.args:
                     if isinstance(arg, ast.Name):
+                        if arg.id not in self.ir.arguments and arg not in self.ir.invariants:
+                            raise SyntaxError(f"Argument \'{arg.id}\' in loop \n\'{astor.to_source(loop).strip()}\'\nis not a stream argument nor an invariant")
                         self.ir.iteration_domain.parameters.add(arg.id)
                 bounds = ()
                 for arg in loop.iter.args[:2]:
@@ -366,8 +369,6 @@ class StreamParser:
             else:
                 raise SyntaxError(
                     f"For loops with iterator \'{loop.target.id}\' can only iterate over ranges")
-
-        # TODO: Check that all elements in iteration_domain.parameters are in ir.invariants or ir.arguments
 
 
 class StreamLexer(astor.ExplicitNodeVisitor):
