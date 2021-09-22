@@ -14,7 +14,7 @@ import logging
 from sys import version
 import inspect
 from functools import partial
-from collections import Counter 
+from collections import Counter
 # import showast
 import ast
 import astor
@@ -124,19 +124,18 @@ channel_chain_length = int(pe_count/pes_per_channel)
 @stream
 def example_func(c_ub, i_ub, j_ub, pe_channel, pe_group, pe, ifmap_dim):
     # Stream invariants
-    pe_start_index_offset  = pe_channel*(ifmap_dim**2)+pe_group*ifmap_dim+pe
+    pe_start_index_offset = pe_channel*(ifmap_dim**2)+pe_group*ifmap_dim+pe
     # Dynamic computations
     for c in range(c_ub, i_ub, j_ub):
         for i in range(i_ub):
             for j in range(j_ub):
-                
+
                 if 1 == 1 and j_ub == 2 and i == j and 4 == ass:
-                    test
                     if 4 == 3:
                         if 3 > a > 4:
                             yield i*ifmap_dim+j+pe_start_index_offset
                         else:
-                            yield 3
+                            varx = asd
                     else:
                         yield i*ifmap_dim+j+pe_start_index_offset
 
@@ -162,7 +161,8 @@ class IterationDomain:
         if len(vector) != len(set(vector)):
             for iterator, count in Counter(vector).items():
                 if count > 1:
-                    raise SyntaxError(f"Duplicate iterator {iterator} in For loops")
+                    raise SyntaxError(
+                        f"Duplicate iterator {iterator} in For loops")
         for val in vector:
             if val == '_':
                 raise SyntaxError(
@@ -240,7 +240,8 @@ class IslIR:
     def check_access_map_aliasing(self):
         #Todo: implement
         pass
-    
+
+
 class StreamParser:
 
     symbol_conversion_table = {
@@ -289,9 +290,11 @@ class StreamParser:
 
     def parse_arguments(self, tokens: StreamTokens):
         if tokens.generator_args.vararg is not None:
-            raise SyntaxError(f"Varargs not allowed in stream template {self.ir.name}")
+            raise SyntaxError(
+                f"Varargs not allowed in stream template {self.ir.name}")
         if tokens.generator_args.kwarg is not None:
-            raise SyntaxError(f"Kwargs not allowed in stream template {self.ir.name}")
+            raise SyntaxError(
+                f"Kwargs not allowed in stream template {self.ir.name}")
 
         num_of_args_with_default_val = len(tokens.generator_args.defaults)
         if num_of_args_with_default_val != 0:
@@ -325,9 +328,10 @@ class StreamParser:
                 if var in invariant_targets:
                     idx_of_var_in_targets = invariant_targets.index(var)
                     if idx_of_var_in_targets >= idx_current_assignment:
-                        raise SyntaxError(f'Invariant assignment \'{target}\' references \'{var}\' before its assignment')
+                        raise SyntaxError(
+                            f'Invariant assignment \'{target}\' references \'{var}\' before its assignment')
         self.ir.invariants = tuple(invariant_targets)
-            
+
     def parse_access_maps(self, tokens: StreamTokens):
         for expr in tokens.yield_exprs:
             condition_list = expr[:-1]
@@ -401,7 +405,8 @@ class StreamParser:
                         raise SyntaxError(
                             f"Invalid bound argument \'{arg}\' for loop range")
             else:
-                raise SyntaxError(f"For loops with iterator \'{loop.target.id}\' can only iterate over ranges")
+                raise SyntaxError(
+                    f"For loops with iterator \'{loop.target.id}\' can only iterate over ranges")
 
         # TODO: Check that all elements in iteration_domain.parameters are in ir.invariants or ir.arguments
 
@@ -436,7 +441,8 @@ class StreamLexer(astor.ExplicitNodeVisitor):
     def visit_FunctionDef(self, node: ast.FunctionDef) -> Any:
         self.tokens.name = node.name
         if node.decorator_list[0].id != 'stream':
-            raise SyntaxError(f"Invalid function \'{node.name}\' used for conversion to ISL IR")
+            raise SyntaxError(
+                f"Invalid function \'{node.name}\' used for conversion to ISL IR")
         self.tokens.generator_args = node.args
         start_of_for_loops_idx = 0
         for idx, _node in enumerate(node.body):
@@ -457,7 +463,8 @@ class StreamLexer(astor.ExplicitNodeVisitor):
     def visit_For(self, node: ast.For) -> Any:
         self.tokens.for_loops += (node, )
         if len(node.body) > 1:
-            logging.warning(f"Multiple statements in body of for loop with iterator \'{node.target.id}\', only the first statement will be parsed")
+            logging.warning(
+                f"Multiple statements in body of for loop with iterator \'{node.target.id}\', only the first statement will be parsed")
         first_entry_in_loop_body = node.body[0]
         if isinstance(first_entry_in_loop_body, ast.For):
             self.visit_For(first_entry_in_loop_body)
@@ -494,11 +501,11 @@ class StreamLexer(astor.ExplicitNodeVisitor):
                 if(isinstance(entry.value, ast.Yield)):
                     self.visit_Yield(entry.value, if_chain)
                 else:
-                    raise Exception(
-                        "Invalid expression type in if condition body, only yield expression are allowed")
+                    raise SyntaxError(
+                        f"Invalid statement \n\'{astor.to_source(entry)}\'\n in if condition body, only yield expression are allowed")
             else:
-                raise Exception(
-                    "Invalid if condition body, only other if statements, and yield expressions are allowed")
+                raise SyntaxError(
+                    f"Invalid statement \n\'{astor.to_source(entry)}\'\n , only other if statements, and yield expressions are allowed")
         if len(node.orelse) == 1:
             entry = node.orelse[0]
             if_chain[-1].test = ast.UnaryOp(op=ast.Not(),
@@ -509,11 +516,11 @@ class StreamLexer(astor.ExplicitNodeVisitor):
                 if(isinstance(entry.value, ast.Yield)):
                     self.visit_Yield(entry.value, if_chain)
                 else:
-                    raise Exception(
-                        "Invalid expression type in if condition body, only yield expression are allowed")
+                    raise SyntaxError(
+                        f"Invalid statement \n\'{astor.to_source(entry)}\'\n in if condition body, only yield expression are allowed")
             else:
-                raise Exception(
-                    "Invalid if condition body, only other if statements, and yield expressions are allowed")
+                raise SyntaxError(
+                    f"Invalid statement \n\'{astor.to_source(entry)}\'\n in if condition body, only other if statements, and yield expressions are allowed")
 
 
 tree = ast.parse(inspect.getsource(inspect.getgeneratorlocals(example_func(
