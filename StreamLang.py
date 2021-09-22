@@ -79,7 +79,6 @@ groups_per_channel = int(pes_per_channel/pes_per_group)
 channel_chain_length = int(pe_count/pes_per_channel)
 
 
-
 @stream
 def example_func(c_ub, i_ub, j_ub, pe_channel, pe_group, pe, ifmap_dim):
     # Stream invariants
@@ -102,6 +101,20 @@ def example_func(c_ub, i_ub, j_ub, pe_channel, pe_group, pe, ifmap_dim):
                 else:
                     yield i*ifmap_dim+j+pe_start_index_offset
 
+@dataclass
+class ISLRepresentation:
+    # TODO: Implement
+    pass
+
+class ISLGenerator:
+    @classmethod
+    def generate(ir):
+        # TODO: Implement
+        pass
+    
+    def check_access_map_aliasing(self):
+        # TODO: Implement
+        pass
 
 @dataclass
 class IterationDomain:
@@ -194,11 +207,6 @@ class IslIR:
     access_maps: Tuple[AccessMap] = ()
     invariants: Tuple[Invariant] = ()
     arguments: Dict[str, Union[int, None]] = field(default_factory=dict)
-
-    def check_access_map_aliasing(self):
-        #Todo: implement
-        pass
-
 
 class StreamParser:
 
