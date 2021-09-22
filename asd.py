@@ -14,7 +14,7 @@ import logging
 from sys import version
 import inspect
 from functools import partial
-from pydantic import BaseModel, ValidationError, validator
+from collections import Counter 
 # import showast
 import ast
 import astor
@@ -158,7 +158,9 @@ class IterationDomain:
     @vector.setter
     def vector(self, vector: Tuple):
         if len(vector) != len(set(vector)):
-            raise SyntaxError("Found duplicates in For loop iterators")
+            for iterator, count in Counter(vector).items():
+                if count > 1:
+                    raise SyntaxError(f"Duplicate iterator {iterator} in For loops")
         for val in vector:
             if val == '_':
                 raise SyntaxError(
@@ -207,7 +209,7 @@ class NamedEntityExtractor(ast.NodeVisitor):
 
     def visit_Name(self, node: ast.Name) -> Any:
         if node.id not in self.ignore:
-            node.id = f'{{{node.id}}}'
+            self.entity_set.add(node.id)
         self.generic_visit(node)
 
     @classmethod
@@ -232,6 +234,10 @@ class IslIR:
     access_maps: Tuple[AccessMap] = ()
     invariants: Tuple[Invariant] = ()
     arguments: Dict[str, Union[int, None]] = field(default_factory=dict)
+
+    def check_access_map_aliasing(self):
+        #Todo: implement
+        pass
 
 
 class StreamParser:
@@ -282,9 +288,9 @@ class StreamParser:
 
     def parse_arguments(self, tokens: StreamTokens):
         if tokens.generator_args.vararg is not None:
-            raise SyntaxError("Varargs not allowed in stream template")
+            raise SyntaxError(f"Varargs not allowed in stream template {self.ir.name}")
         if tokens.generator_args.kwarg is not None:
-            raise SyntaxError("Kwargs not allowed in stream template")
+            raise SyntaxError(f"Kwargs not allowed in stream template {self.ir.name}")
 
         num_of_args_with_default_val = len(tokens.generator_args.defaults)
         if num_of_args_with_default_val != 0:
@@ -302,8 +308,25 @@ class StreamParser:
             self.ir.arguments[arg.arg] = default
 
     def parse_invariants(self, tokens: StreamTokens):
-        pass
-
+        # TODO: Implement
+        invariant_targets = [
+            assignment.targets[0].id for assignment in tokens.invariant_assignments]
+        for idx_current_assignment, assignment in enumerate(tokens.invariant_assignments):
+            target = assignment.targets[0].id
+            if len(assignment.targets) > 1:
+                raise SyntaxError(
+                    f'Invariant assignment with target \'{target}\' can only have one target')
+            assignment_vars = NamedEntityExtractor.extract(assignment.value)
+            for var in assignment_vars:
+                if var not in invariant_targets and var not in self.ir.arguments.keys():
+                    raise SyntaxError(
+                        f'Invalid variable in invariant assignment target \'{target}\', \'{var}\' is not a stream template arg nor is it another invariant')
+                if var in invariant_targets:
+                    idx_of_var_in_targets = invariant_targets.index(var)
+                    if idx_of_var_in_targets >= idx_current_assignment:
+                        raise SyntaxError(f'Invariant assignment \'{target}\' references \'{var}\' before its assignment')
+        self.ir.invariants = tuple(invariant_targets)
+            
     def parse_access_maps(self, tokens: StreamTokens):
         for expr in tokens.yield_exprs:
             condition_list = expr[:-1]
@@ -316,7 +339,10 @@ class StreamParser:
                     chain_parameter_set.add(param)
             for param in NamedEntityExtractor.extract(yield_expr, ignore=self.ir.iteration_domain.vector):
                 chain_parameter_set.add(param)
-                # Get condition
+
+            # TODO: Check that all elements in chain_param_set are in ir.invariants or ir.arguments
+
+            # Get condition
             chain_conditions_expr = self.convert_expr_to_str(
                 ast.BoolOp(op=ast.And(), values=[
                     self.convert_access_map_condition_to_expr(condition.test)
@@ -376,6 +402,8 @@ class StreamParser:
             else:
                 raise Exception("For loops can only iterate over ranges")
 
+        # TODO: Check that all elements in iteration_domain.parameters are in ir.invariants or ir.arguments
+
 
 class StreamLexer(astor.ExplicitNodeVisitor):
 
@@ -405,9 +433,9 @@ class StreamLexer(astor.ExplicitNodeVisitor):
         self.visit_FunctionDef(stream_func_def_node)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> Any:
+        self.tokens.name = node.name
         if node.decorator_list[0].id != 'stream':
             raise Exception("Invalid function used for conversion to ISL IR")
-        self.tokens.name = node.name
         self.tokens.generator_args = node.args
         start_of_for_loops_idx = 0
         for idx, _node in enumerate(node.body):
