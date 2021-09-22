@@ -124,12 +124,14 @@ channel_chain_length = int(pe_count/pes_per_channel)
 @stream
 def example_func(c_ub, i_ub, j_ub, pe_channel, pe_group, pe, ifmap_dim):
     # Stream invariants
-    pe_start_index_offset = pe_channel*(ifmap_dim**2)+pe_group*ifmap_dim+pe
+    pe_start_index_offset  = pe_channel*(ifmap_dim**2)+pe_group*ifmap_dim+pe
     # Dynamic computations
     for c in range(c_ub, i_ub, j_ub):
         for i in range(i_ub):
             for j in range(j_ub):
+                
                 if 1 == 1 and j_ub == 2 and i == j and 4 == ass:
+                    test
                     if 4 == 3:
                         if 3 > a > 4:
                             yield i*ifmap_dim+j+pe_start_index_offset
@@ -238,8 +240,7 @@ class IslIR:
     def check_access_map_aliasing(self):
         #Todo: implement
         pass
-
-
+    
 class StreamParser:
 
     symbol_conversion_table = {
@@ -387,8 +388,8 @@ class StreamParser:
                     except AttributeError:
                         bounds += (arg.id, )
                     except AttributeError:
-                        raise Exception(
-                            "Invalid bound argument(s) for loop range")
+                        raise SyntaxError(
+                            f"Invalid bound argument \'{arg}\' for loop range")
                 self.ir.iteration_domain.bounds += (bounds, )
                 if len(loop.iter.args) == 3:
                     arg = loop.iter.args[2]
@@ -397,10 +398,10 @@ class StreamParser:
                     except AttributeError:
                         self.ir.iteration_domain.steps += (arg.id, )
                     except AttributeError:
-                        raise Exception(
-                            "Invalid bound argument(s) for loop range")
+                        raise SyntaxError(
+                            f"Invalid bound argument \'{arg}\' for loop range")
             else:
-                raise Exception("For loops can only iterate over ranges")
+                raise SyntaxError(f"For loops with iterator \'{loop.target.id}\' can only iterate over ranges")
 
         # TODO: Check that all elements in iteration_domain.parameters are in ir.invariants or ir.arguments
 
@@ -435,7 +436,7 @@ class StreamLexer(astor.ExplicitNodeVisitor):
     def visit_FunctionDef(self, node: ast.FunctionDef) -> Any:
         self.tokens.name = node.name
         if node.decorator_list[0].id != 'stream':
-            raise Exception("Invalid function used for conversion to ISL IR")
+            raise SyntaxError(f"Invalid function \'{node.name}\' used for conversion to ISL IR")
         self.tokens.generator_args = node.args
         start_of_for_loops_idx = 0
         for idx, _node in enumerate(node.body):
@@ -445,8 +446,8 @@ class StreamLexer(astor.ExplicitNodeVisitor):
                 start_of_for_loops_idx = idx
                 break
             else:
-                raise Exception(
-                    "Invalid expression in function body, only constant assignments, and for loops are allowed")
+                raise SyntaxError(
+                    f"Invalid expression \'{astor.to_source(_node).strip()}\' in \'{node.name}\' body. Only constant assignments, and for loops are allowed")
 
         if start_of_for_loops_idx != len(node.body) - 1:
             logging.warning(
@@ -455,6 +456,8 @@ class StreamLexer(astor.ExplicitNodeVisitor):
 
     def visit_For(self, node: ast.For) -> Any:
         self.tokens.for_loops += (node, )
+        if len(node.body) > 1:
+            logging.warning(f"Multiple statements in body of for loop with iterator \'{node.target.id}\', only the first statement will be parsed")
         first_entry_in_loop_body = node.body[0]
         if isinstance(first_entry_in_loop_body, ast.For):
             self.visit_For(first_entry_in_loop_body)
@@ -464,11 +467,11 @@ class StreamLexer(astor.ExplicitNodeVisitor):
             if isinstance(first_entry_in_loop_body.value, ast.Yield):
                 self.visit_Yield(first_entry_in_loop_body.value)
             else:
-                raise Exception(
-                    "Invalid expression type in for loop body, only yield expressions are allowed")
+                raise SyntaxError(
+                    f"Invalid expression \'{astor.to_source(first_entry_in_loop_body).strip()}\' in for loop body, only yield expressions are allowed")
         else:
-            raise Exception(
-                "Invalid for body, only for loops, if statements, and yield expressions are allowed in a for loop")
+            raise SyntaxError(
+                f"Invalid statement \'{astor.to_source(first_entry_in_loop_body).strip()}\' in for loop with iterator  \'{node.target.id}\' body, only other for loops, if statements, and yield expressions are allowed")
 
     def visit_Yield(self, node: ast.Yield, if_chain: Tuple = ()) -> Any:
         if_chain += (deepcopy(node), )
@@ -476,9 +479,13 @@ class StreamLexer(astor.ExplicitNodeVisitor):
 
     def visit_If(self, node: ast.If, if_chain=()) -> Any:
         if_chain += (deepcopy(node), )
-        if len(node.body) > 1 or len(node.orelse) > 1:
-            raise Exception(
-                "Too many expressions in if/elif/else statement bodies, something fishy is going on....")
+        if len(node.body) > 1:
+            raise SyntaxError(
+                f"Invalid additional expression in if/elif/else body \n\'{astor.to_source(node.body[1]).strip()}\'\n\nonly one expression is allowed in if/elif/else body")
+        if len(node.orelse) > 1:
+            raise SyntaxError(
+                f"Invalid additional expression in if/elif/else body \n\'{astor.to_source(node.orelse[1]).strip()}\'\n\nonly one expression is allowed in if/elif/else body")
+
         if len(node.body) == 1:
             entry = node.body[0]
             if isinstance(entry, ast.If):
