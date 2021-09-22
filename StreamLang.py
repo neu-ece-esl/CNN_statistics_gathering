@@ -298,11 +298,14 @@ class StreamParser:
             chain_parameter_set = set()
             for condition in condition_list:
                 for param in NamedEntityExtractor.extract(condition.test, ignore=self.ir.iteration_domain.vector):
+                    if param not in self.ir.arguments and param not in self.ir.invariants:
+                        raise SyntaxError(f"Parameter {param} in expression \n\'{astor.to_source(condition.test).strip()}\'\nis not a stream argument nor an invariant")
                     chain_parameter_set.add(param)
             
             for param in NamedEntityExtractor.extract(yield_expr, ignore=self.ir.iteration_domain.vector):
+                if param not in self.ir.arguments and param not in self.ir.invariants:
+                    raise SyntaxError(f"Parameter {param} in expression \n\'{astor.to_source(yield_expr.value).strip()}\'\nis not a stream argument nor an invariant")
                 chain_parameter_set.add(param)
-
             # Get condition
             chain_conditions_expr = self.convert_expr_to_str(
                 ast.BoolOp(op=ast.And(), values=[
