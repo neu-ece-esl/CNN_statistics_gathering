@@ -1,6 +1,6 @@
-# To add a new cell, type '# %%'
-# To add a new markdown cell, type '# %% [markdown]'
-# %%
+# To add a new cell, type ''
+# To add a new markdown cell, type ' [markdown]'
+
 
 from ast import Eq
 import islpy as isl
@@ -23,47 +23,6 @@ logging.basicConfig(level=logging.INFO)
 logging.info(version)
 traceSignals.filename = 'Top'
 traceSignals.tracebackup = False
-
-
-@dataclass
-class StreamStateController:
-    index_generator_fn: Generator
-    initial_index_generator_fn: Generator = None
-    _done: bool = False
-
-    def __post_init__(self):
-        self.index_generator_fn, self.initial_index_generator_fn = tee(
-            self.index_generator_fn)
-
-    def reset(self):
-        self.done = False
-        self.index_generator_fn = self.initial_index_generator_fn
-        self.index_generator_fn, self.initial_index_generator_fn = tee(
-            self.index_generator_fn)
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        try:
-            next_index = next(self.index_generator_fn)
-        except StopIteration:
-            next_index = 0
-            self.done = True
-        return next_index
-
-    @property
-    def done(self):
-        return self._done
-
-    @done.setter
-    def done(self, val):
-        if val:
-            logging.debug("{} has concluded @T={}".format(self, now()))
-        else:
-            logging.debug("{} initialized @T={}".format(self, now()))
-        self._done = val
-
 
 @dataclass
 class StreamTemplate:
@@ -120,7 +79,7 @@ groups_per_channel = int(pes_per_channel/pes_per_group)
 channel_chain_length = int(pe_count/pes_per_channel)
 
 
-# %%
+
 @stream
 def example_func(c_ub, i_ub, j_ub, pe_channel, pe_group, pe, ifmap_dim):
     # Stream invariants
@@ -129,13 +88,12 @@ def example_func(c_ub, i_ub, j_ub, pe_channel, pe_group, pe, ifmap_dim):
     for c in range(c_ub, i_ub, j_ub):
         for i in range(i_ub):
             for j in range(j_ub):
-
-                if 1 == 1 and j_ub == 2 and i == j and 4 == ass:
+                if 1 == 1 and j_ub == 2 and i == j and 4 == pe_start_index_offset:
                     if 4 == 3:
-                        if 3 > a > 4:
+                        if 3 > 3 > 4:
                             yield i*ifmap_dim+j+pe_start_index_offset
                         else:
-                            varx = asd
+                            yield -1
                     else:
                         yield i*ifmap_dim+j+pe_start_index_offset
 
@@ -312,7 +270,6 @@ class StreamParser:
             self.ir.arguments[arg.arg] = default
 
     def parse_invariants(self, tokens: StreamTokens):
-        # TODO: Implement
         invariant_targets = [
             assignment.targets[0].id for assignment in tokens.invariant_assignments]
         for idx_current_assignment, assignment in enumerate(tokens.invariant_assignments):
@@ -342,10 +299,9 @@ class StreamParser:
             for condition in condition_list:
                 for param in NamedEntityExtractor.extract(condition.test, ignore=self.ir.iteration_domain.vector):
                     chain_parameter_set.add(param)
+            
             for param in NamedEntityExtractor.extract(yield_expr, ignore=self.ir.iteration_domain.vector):
                 chain_parameter_set.add(param)
-
-            # TODO: Check that all elements in chain_param_set are in ir.invariants or ir.arguments
 
             # Get condition
             chain_conditions_expr = self.convert_expr_to_str(
@@ -527,7 +483,7 @@ tree = ast.parse(inspect.getsource(inspect.getgeneratorlocals(example_func(
     1, ofmap_dim, ofmap_dim, 0, 0, 0, ifmap_dim, start_time=0))['self']._generator_func_def))
 
 
-# %%
+
 tokens = StreamLexer.lex(tree)
 ir = StreamParser.parse(tokens)
 # parser.isl_ir.parse_iteration_domain()
