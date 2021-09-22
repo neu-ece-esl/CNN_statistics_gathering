@@ -147,7 +147,7 @@ class AccessMap:
     access_expr_with_annotated_parameters: str = ''
     condition: str = ''
     condition_with_annotated_parameters: str = ''
-    parameters: Set[str] = ()
+    parameters: Set[str] = field(default_factory=set)
 
 
 @dataclass
