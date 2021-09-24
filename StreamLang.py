@@ -105,6 +105,11 @@ def example_func(c_ub, i_ub, j_ub, pe_channel, pe_group, pe, ifmap_dim):
 class ISLGenerator:
     @classmethod
     def generate_abstract_repr(ir):
+        def create_iteration_domain_set(self, stream_name: str, iteration_domain: IterationDomain):
+            params = remove_brackets(get_string_repr(iteration_domain.parameters))
+            it_vector = remove_brackets(get_string_repr(iteration_domain.vector))
+            bounds = remove_brackets(get_string_repr(iteration_domain.bounds))
+            structure = f'{{ [{params}] -> {stream_name.upper()}[{it_vector}] : {bounds}}}'
         # TODO: Implement
         pass
 
@@ -221,8 +226,6 @@ class ISLAbstractRepresentation:
     def __init__(self, ir : IslIR) -> None:
     #    self.iteration_domain = isl.BasicSet(iteration_domain.) 
         pass
-    def create_iteration_domain_set(self, stream_name: str, iteration_domain: IterationDomain):
-        structure = f'{{ {stream_name.upper()}[{remove_brackets(get_string_repr(iteration_domain.bounds))}] }}'
 
 
 @dataclass

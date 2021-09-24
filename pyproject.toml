@@ -27,6 +27,7 @@ autopep8 = "^1.5.7"
 showast = "^0.2.4"
 astor = "^0.8.1"
 pydantic = "^1.8.2"
+mypy = "^0.910"
 
 [tool.poetry.dev-dependencies]
 
