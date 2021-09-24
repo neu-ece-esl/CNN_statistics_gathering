@@ -24,6 +24,7 @@ logging.info(version)
 traceSignals.filename = 'Top'
 traceSignals.tracebackup = False
 
+
 @dataclass
 class StreamTemplate:
     _generator_func_def: Generator
@@ -101,20 +102,21 @@ def example_func(c_ub, i_ub, j_ub, pe_channel, pe_group, pe, ifmap_dim):
                 else:
                     yield i*ifmap_dim+j+pe_start_index_offset
 
-@dataclass
-class ISLRepresentation:
-    # TODO: Implement
-    pass
-
 class ISLGenerator:
     @classmethod
-    def generate(ir):
+    def generate_abstract_repr(ir):
         # TODO: Implement
         pass
-    
+
+    @classmethod
+    def generate_concrete_repr(ir):
+        # TODO: Implement
+        pass
+
     def check_access_map_aliasing(self):
         # TODO: Implement
         pass
+
 
 @dataclass
 class IterationDomain:
@@ -149,11 +151,9 @@ class AccessMap:
     condition_with_annotated_parameters: str = ''
     parameters: Set[str] = field(default_factory=set)
 
-
 @dataclass
 class Invariant:
     name: str = ''
-
 
 class NamedEntityAnnotator(ast.NodeVisitor):
     def __init__(self, _ignore) -> None:
@@ -195,6 +195,8 @@ class NamedEntityExtractor(ast.NodeVisitor):
 @dataclass
 class StreamTokens:
     name: str = ''
+    start_time: int = 0
+    accessed_array : str = ''
     generator_args: ast.arguments = None
     yield_exprs: Tuple[Union[ast.Yield, Tuple[Union[ast.If, ast.Yield]]]] = ()
     invariant_assignments: Tuple[ast.Assign] = ()
@@ -207,6 +209,26 @@ class IslIR:
     access_maps: Tuple[AccessMap] = ()
     invariants: Tuple[Invariant] = ()
     arguments: Dict[str, Union[int, None]] = field(default_factory=dict)
+
+def get_string_repr(s):
+    return s.__str__()
+
+def remove_brackets(s):
+    return s[1:-1]
+
+class ISLAbstractRepresentation:
+    # TODO: Implement
+    def __init__(self, ir : IslIR) -> None:
+    #    self.iteration_domain = isl.BasicSet(iteration_domain.) 
+        pass
+    def create_iteration_domain_set(self, stream_name: str, iteration_domain: IterationDomain):
+        structure = f'{{ {stream_name.upper()}[{remove_brackets(get_string_repr(iteration_domain.bounds))}] }}'
+
+
+@dataclass
+class ISLConcreteRepresentation:
+    # TODO: Implement
+    pass
 
 class StreamParser:
 
@@ -307,14 +329,16 @@ class StreamParser:
             for condition in condition_list:
                 for param in NamedEntityExtractor.extract(condition.test, ignore=self.ir.iteration_domain.vector):
                     if param not in self.ir.arguments and param not in self.ir.invariants:
-                        raise SyntaxError(f"Parameter {param} in expression \n\'{astor.to_source(condition.test).strip()}\'\nis not a stream argument nor an invariant")
+                        raise SyntaxError(
+                            f"Parameter {param} in expression \n\'{astor.to_source(condition.test).strip()}\'\nis not a stream argument nor an invariant")
                     chain_parameter_set.add(param)
-            
+
             for param in NamedEntityExtractor.extract(yield_expr, ignore=self.ir.iteration_domain.vector):
                 if param not in self.ir.arguments and param not in self.ir.invariants:
-                    raise SyntaxError(f"Parameter {param} in expression \n\'{astor.to_source(yield_expr.value).strip()}\'\nis not a stream argument nor an invariant")
+                    raise SyntaxError(
+                        f"Parameter {param} in expression \n\'{astor.to_source(yield_expr.value).strip()}\'\nis not a stream argument nor an invariant")
                 chain_parameter_set.add(param)
-            
+
             # Get condition
             chain_conditions_expr = self.convert_expr_to_str(
                 ast.BoolOp(op=ast.And(), values=[
@@ -353,8 +377,10 @@ class StreamParser:
                 for arg in loop.iter.args:
                     if isinstance(arg, ast.Name):
                         if arg.id not in self.ir.arguments and arg not in self.ir.invariants:
-                            raise SyntaxError(f"Argument \'{arg.id}\' in loop \n\'{astor.to_source(loop).strip()}\'\nis not a stream argument nor an invariant")
+                            raise SyntaxError(
+                                f"Argument \'{arg.id}\' in loop \n\'{astor.to_source(loop).strip()}\'\nis not a stream argument nor an invariant")
                         self.ir.iteration_domain.parameters.add(arg.id)
+                    # TODO: Handle non name instance e.g. function
                 bounds = ()
                 for arg in loop.iter.args[:2]:
                     try:
@@ -379,14 +405,14 @@ class StreamParser:
                     f"For loops with iterator \'{loop.target.id}\' can only iterate over ranges")
 
 
-class StreamLexer(astor.ExplicitNodeVisitor):
+class StreamExtractor(astor.ExplicitNodeVisitor):
 
     @classmethod
-    def lex(cls, node):
-        lexer = cls()
-        lexer.visit(node)
-        lexer.prune_orelse()
-        return lexer.tokens
+    def extract(cls, node, start_time = None, accessed_array = None):
+        extractor = cls()
+        extractor.visit(node)
+        extractor.prune_orelse()
+        return extractor.tokens
 
     def __init__(self):
         self.tokens = StreamTokens()
@@ -495,8 +521,7 @@ tree = ast.parse(inspect.getsource(inspect.getgeneratorlocals(example_func(
     1, ofmap_dim, ofmap_dim, 0, 0, 0, ifmap_dim, start_time=0))['self']._generator_func_def))
 
 
-
-tokens = StreamLexer.lex(tree)
+tokens = StreamExtractor.extract(tree)
 ir = StreamParser.parse(tokens)
 # parser.isl_ir.parse_iteration_domain()
 # parser.isl_ir.parse_access_maps()
