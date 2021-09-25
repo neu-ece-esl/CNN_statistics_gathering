@@ -28,6 +28,8 @@ showast = "^0.2.4"
 astor = "^0.8.1"
 pydantic = "^1.8.2"
 mypy = "^0.910"
+pylama = "^7.7.1"
+black = "^21.9b0"
 
 [tool.poetry.dev-dependencies]
 
