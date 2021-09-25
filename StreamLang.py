@@ -135,33 +135,6 @@ def example_func(c_ub, i_ub, j_ub, pe_channel, pe_group, pe, ifmap_dim):
                     yield i * ifmap_dim + j + pe_start_index_offset
 
 
-class ISLGenerator:
-    @classmethod
-    def generate_abstract_repr(cls, ir):
-        params = remove_brackets(get_string_repr(ir.iteration_domain.parameters))
-        it_vector = remove_brackets(get_string_repr(ir.iteration_domain.vector))
-        bounds = remove_brackets(get_string_repr(ir.iteration_domain.bounds))
-        step_adjustment = ""
-        for idx, step in enumerate(ir.iteration_domain.steps):
-            step_adjustment += " and "
-            step_adjustment += " {ir.iteration_domain.bounds[idx]}%{step}=0"
-        structure = (
-            f"{{ [{params}] -> {ir.stream_name.upper()}[{it_vector}] : {bounds}}}"
-        )
-
-        # TODO: Implement
-        pass
-
-    @classmethod
-    def generate_concrete_repr(ir):
-        # TODO: Implement
-        pass
-
-    def check_access_map_aliasing(self):
-        # TODO: Implement
-        pass
-
-
 @dataclass
 class IterationDomain:
     _vector: Tuple[str] = ()
@@ -248,18 +221,11 @@ class StreamTokens:
 
 @dataclass
 class IslIR:
+    name: str = ""
     iteration_domain: IterationDomain = IterationDomain()
     access_maps: Tuple[AccessMap] = ()
     invariants: Tuple[Invariant] = ()
     arguments: Dict[str, Union[int, None]] = field(default_factory=dict)
-
-
-def get_string_repr(s):
-    return s.__str__()
-
-
-def remove_brackets(s):
-    return s[1:-1]
 
 
 class ISLAbstractRepresentation:
@@ -273,6 +239,64 @@ class ISLAbstractRepresentation:
 class ISLConcreteRepresentation:
     # TODO: Implement
     pass
+
+
+class ISLGenerator:
+    @staticmethod
+    def get_string_repr(s):
+        return s.__str__()
+
+    @staticmethod
+    def remove_brackets(s):
+        return s[1:-1]
+
+    @staticmethod
+    def remove_single_quotes(s):
+        return re.sub("'", "", s)
+
+    @staticmethod
+    def preprocess_iterable(it):
+        return ISLGenerator.remove_single_quotes(
+            ISLGenerator.remove_brackets(ISLGenerator.get_string_repr(it))
+        )
+
+    @classmethod
+    def generate_abstract_repr(cls, ir: IslIR):
+        params = ISLGenerator.preprocess_iterable(ir.iteration_domain.parameters)
+        it_vector = ISLGenerator.preprocess_iterable(ir.iteration_domain.vector)
+
+        bound_tuples = zip(ir.iteration_domain.vector, ir.iteration_domain.bounds)
+
+        bound_expr = ""
+        for iterator, bound in bound_tuples:
+            # upper bound
+            if len(bound) == 1:
+                bound_expr += f" 0 <= {iterator} < {bound[0]} "
+            # upper and lower bound
+            elif len(bound) == 2:
+                bound_expr += f" {bound[0]} <= {iterator} < {bound[1]} "
+
+            else:
+                raise SyntaxError("Invalid number of iterator bounds")
+
+        step_adjustment = ""
+        for idx, step in enumerate(ir.iteration_domain.steps):
+            step_adjustment += " and "
+            step_adjustment += f" {ir.iteration_domain.vector[idx]}%{step}=0"
+
+        structure = f"{{ [{params}] -> {ir.name.upper()}[{it_vector}] : {bound_expr} {step_adjustment}}}"
+
+        # TODO: Implement
+        pass
+
+    @classmethod
+    def generate_concrete_repr(ir):
+        # TODO: Implement
+        pass
+
+    def check_access_map_aliasing(self):
+        # TODO: Implement
+        pass
 
 
 class StreamParser:
