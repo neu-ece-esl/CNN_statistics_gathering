@@ -137,16 +137,17 @@ def example_func(c_ub, i_ub, j_ub, pe_channel, pe_group, pe, ifmap_dim):
 
 class ISLGenerator:
     @classmethod
-    def generate_abstract_repr(ir):
-        def create_iteration_domain_set(
-            self, stream_name: str, iteration_domain: IterationDomain
-        ):
-            params = remove_brackets(get_string_repr(iteration_domain.parameters))
-            it_vector = remove_brackets(get_string_repr(iteration_domain.vector))
-            bounds = remove_brackets(get_string_repr(iteration_domain.bounds))
-            structure = (
-                f"{{ [{params}] -> {stream_name.upper()}[{it_vector}] : {bounds}}}"
-            )
+    def generate_abstract_repr(cls, ir):
+        params = remove_brackets(get_string_repr(ir.iteration_domain.parameters))
+        it_vector = remove_brackets(get_string_repr(ir.iteration_domain.vector))
+        bounds = remove_brackets(get_string_repr(ir.iteration_domain.bounds))
+        step_adjustment = ""
+        for idx, step in enumerate(ir.iteration_domain.steps):
+            step_adjustment += " and "
+            step_adjustment += " {ir.iteration_domain.bounds[idx]}%{step}=0"
+        structure = (
+            f"{{ [{params}] -> {ir.stream_name.upper()}[{it_vector}] : {bounds}}}"
+        )
 
         # TODO: Implement
         pass
@@ -163,8 +164,8 @@ class ISLGenerator:
 
 @dataclass
 class IterationDomain:
-    _vector: Tuple[str] = ("",)
-    bounds: Tuple[Tuple[Union[int, str]]] = ("", 0)
+    _vector: Tuple[str] = ()
+    bounds: Tuple[Tuple[Union[int, str]]] = ()
     steps: Tuple[Tuple[Union[int, str]]] = ()
     parameters: Set[str] = field(default_factory=set)
 
@@ -618,6 +619,5 @@ tree = ast.parse(
 
 tokens = StreamExtractor.extract(tree)
 ir = StreamParser.parse(tokens)
-# parser.isl_ir.parse_iteration_domain()
-# parser.isl_ir.parse_access_maps()
+abs_repr = ISLGenerator.generate_abstract_repr(ir)
 print("DONE")
