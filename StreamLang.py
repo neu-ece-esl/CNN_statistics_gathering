@@ -117,7 +117,7 @@ def example_func(c_ub, i_ub, j_ub, pe_channel, pe_group, pe, ifmap_dim):
     # Stream invariants
     pe_start_index_offset = pe_channel * (ifmap_dim ** 2) + pe_group * ifmap_dim + pe
     # Dynamic computations
-    for c in range(c_ub, i_ub, j_ub):
+    for c in range(c_ub, i_ub, 2):
         for i in range(i_ub):
             for j in range(j_ub):
                 if 1 == 1 and j_ub == 2 and i == j and 4 == pe_start_index_offset:
@@ -285,12 +285,11 @@ class ISLGenerator:
         step_adjustment = ""
         for idx, step in enumerate(ir.iteration_domain.steps):
             step_adjustment += "and"
-            step_adjustment += f" {ir.iteration_domain.vector[idx]}%{step}=0 "
+            step_adjustment += f" {ir.iteration_domain.vector[idx]} mod {step} = 0 "
 
-        structure = f"{{ [{params}] -> {ir.name.upper()}[{it_vector}] : {bound_expr} {step_adjustment}}}"
+        structure = f"[{params}] -> {{ {ir.name.upper()}[{it_vector}] : {bound_expr} {step_adjustment}}}"
 
-        # TODO: Implement
-        pass
+        print(isl.BasicSet(structure))
 
     @classmethod
     def generate_concrete_repr(ir):
