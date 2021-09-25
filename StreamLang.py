@@ -265,24 +265,27 @@ class ISLGenerator:
         params = ISLGenerator.preprocess_iterable(ir.iteration_domain.parameters)
         it_vector = ISLGenerator.preprocess_iterable(ir.iteration_domain.vector)
 
-        bound_tuples = zip(ir.iteration_domain.vector, ir.iteration_domain.bounds)
+        bound_tuples = list(zip(ir.iteration_domain.vector, ir.iteration_domain.bounds))
+        bound_tuples_count = len(bound_tuples)
 
         bound_expr = ""
-        for iterator, bound in bound_tuples:
+        for idx, (iterator, bound) in enumerate(bound_tuples):
             # upper bound
             if len(bound) == 1:
                 bound_expr += f" 0 <= {iterator} < {bound[0]} "
             # upper and lower bound
             elif len(bound) == 2:
                 bound_expr += f" {bound[0]} <= {iterator} < {bound[1]} "
-
             else:
                 raise SyntaxError("Invalid number of iterator bounds")
 
+            if idx < bound_tuples_count - 1:
+                bound_expr += "and"
+
         step_adjustment = ""
         for idx, step in enumerate(ir.iteration_domain.steps):
-            step_adjustment += " and "
-            step_adjustment += f" {ir.iteration_domain.vector[idx]}%{step}=0"
+            step_adjustment += "and"
+            step_adjustment += f" {ir.iteration_domain.vector[idx]}%{step}=0 "
 
         structure = f"{{ [{params}] -> {ir.name.upper()}[{it_vector}] : {bound_expr} {step_adjustment}}}"
 
@@ -498,10 +501,8 @@ class StreamParser:
                     try:
                         self.ir.iteration_domain.steps += (arg.value,)
                     except AttributeError:
-                        self.ir.iteration_domain.steps += (arg.id,)
-                    except AttributeError:
                         raise SyntaxError(
-                            f"Invalid bound argument '{arg}' for loop range"
+                            f"Invalid step argument '{arg.id}' in for loop range, only constants are allowed"
                         )
             else:
                 raise SyntaxError(
