@@ -240,8 +240,7 @@ class ISLConcreteRepresentation:
     # TODO: Implement
     pass
 
-
-class ISLGenerator:
+class ISLGeneratorPreprocessor:
     @staticmethod
     def get_string_repr(s):
         return s.__str__()
@@ -260,10 +259,12 @@ class ISLGenerator:
             ISLGenerator.remove_brackets(ISLGenerator.get_string_repr(it))
         )
 
+class ISLGenerator:
+
     @classmethod
     def generate_abstract_repr(cls, ir: IslIR):
-        params = ISLGenerator.preprocess_iterable(ir.iteration_domain.parameters)
-        it_vector = ISLGenerator.preprocess_iterable(ir.iteration_domain.vector)
+        params = ISLGeneratorPreprocessor.preprocess_iterable(ir.iteration_domain.parameters)
+        it_vector = ISLGeneratorPreprocessor.preprocess_iterable(ir.iteration_domain.vector)
 
         bound_tuples = list(zip(ir.iteration_domain.vector, ir.iteration_domain.bounds))
         bound_tuples_count = len(bound_tuples)
@@ -289,7 +290,7 @@ class ISLGenerator:
 
         structure = f"[{params}] -> {{ {ir.name.upper()}[{it_vector}] : {bound_expr} {step_adjustment}}}"
 
-        print(isl.BasicSet(structure))
+        return isl.BasicSet(structure)
 
     @classmethod
     def generate_concrete_repr(ir):
