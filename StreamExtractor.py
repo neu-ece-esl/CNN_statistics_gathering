@@ -1,4 +1,18 @@
+from typing import (
+    Tuple,
+    Any,
+)
+from copy import deepcopy
+import logging
+from sys import version
 
+# import showast
+import ast
+import astor
+from StreamIntermediates import StreamTokens
+
+logging.basicConfig(level=logging.INFO)
+logging.info(version)
 
 class StreamExtractor(astor.ExplicitNodeVisitor):
     @classmethod

@@ -1,4 +1,15 @@
 
+import islpy as isl
+from dataclasses import dataclass, field
+from typing import (
+    Tuple,
+    Union,
+    Set,
+)
+from sys import version
+from functools import partial
+from collections import Counter
+from StreamHelpers import ISLGeneratorPreprocessor
 @dataclass
 class IterationDomain:
     _vector: Tuple[str] = ()
@@ -21,9 +32,7 @@ class IterationDomain:
                 raise SyntaxError("Anonymous iterators not allowed in for loops")
         self._vector = vector
 
-
-    @classmethod
-    def generate_abstract_repr(cls, name, iteration_domain):
+    def to_abstract_repr(self, name, iteration_domain):
         params = ISLGeneratorPreprocessor.preprocess_iterable(iteration_domain.parameters)
         it_vector = ISLGeneratorPreprocessor.preprocess_iterable(iteration_domain.vector)
 
@@ -62,8 +71,7 @@ class AccessMap:
     condition_with_annotated_parameters: str = ""
     parameters: Set[str] = field(default_factory=set)
 
-    @classmethod
-    def generate_abstract_repr(cls, name, access_map):
+    def to_abstract_repr(self, name, access_map):
         params = ISLGeneratorPreprocessor.preprocess_iterable(access_map.parameters)
         
         if len(access_map.access_expr) != len(access_map.condition):

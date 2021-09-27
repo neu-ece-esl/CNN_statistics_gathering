@@ -1,6 +1,4 @@
-from ast import Eq
-import islpy as isl
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import (
     Generator,
 )

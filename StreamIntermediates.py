@@ -1,17 +1,11 @@
-
-class ISLAbstractRepresentation:
-    # TODO: Implement
-    def __init__(self, ir: IslIR) -> None:
-        #    self.iteration_domain = isl.BasicSet(iteration_domain.)
-        pass
-
-
-@dataclass
-class ISLConcreteRepresentation:
-    # TODO: Implement
-    pass
-
-
+from dataclasses import dataclass, field
+from typing import (
+    Dict,
+    Tuple,
+    Union,
+)
+import ast
+from StreamParserPrimitives import IterationDomain, AccessMap, Invariant
 @dataclass
 class IslIR:
     name: str = ""
@@ -19,9 +13,6 @@ class IslIR:
     access_maps: Tuple[AccessMap] = ()
     invariants: Tuple[Invariant] = ()
     arguments: Dict[str, Union[int, None]] = field(default_factory=dict)
-
-
-
 
 @dataclass
 class StreamTokens:
@@ -32,3 +23,13 @@ class StreamTokens:
     yield_exprs: Tuple[Union[ast.Yield, Tuple[Union[ast.If, ast.Yield]]]] = ()
     invariant_assignments: Tuple[ast.Assign] = ()
     for_loops: Tuple[ast.For] = ()
+    
+class ISLAbstractRepresentation:
+    # TODO: Implement
+    def __init__(self, ir: IslIR) -> None:
+        pass
+
+@dataclass
+class ISLConcreteRepresentation:
+    # TODO: Implement
+    pass
