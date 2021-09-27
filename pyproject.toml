@@ -30,6 +30,7 @@ pydantic = "^1.8.2"
 mypy = "^0.910"
 pylama = "^7.7.1"
 black = "^21.9b0"
+pylint = "^2.11.1"
 
 [tool.poetry.dev-dependencies]
 
