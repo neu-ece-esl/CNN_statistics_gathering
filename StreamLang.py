@@ -59,5 +59,5 @@ tree = ast.parse(
 
 tokens = StreamExtractor.extract(tree)
 ir = StreamParser.parse(tokens)
-abs_repr = ISLGenerator.generate_abstract_repr(ir)
+abs_repr = ISLGenerator.generate_concrete_repr(ir)
 print("DONE")

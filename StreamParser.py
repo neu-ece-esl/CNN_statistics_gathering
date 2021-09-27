@@ -118,6 +118,8 @@ class StreamParser:
                         )
                     chain_parameter_set.add(param)
 
+
+            yield_expr_params = set()            
             for param in NamedEntityExtractor.extract(
                 yield_expr, ignore=self.ir.iteration_domain.vector
             ):
@@ -125,7 +127,7 @@ class StreamParser:
                     raise SyntaxError(
                         f"Parameter {param} in expression \n'{astor.to_source(yield_expr.value).strip()}'\nis not a stream argument nor an invariant"
                     )
-                chain_parameter_set.add(param)
+                yield_expr_params.add(param)
 
             # Get condition
             chain_conditions_expr = self.convert_expr_to_str(
@@ -165,7 +167,8 @@ class StreamParser:
                     access_expr_with_annotated_parameters=yield_expr_with_annotated_params,
                     condition=chain_conditions_expr,
                     condition_with_annotated_parameters=chain_conditions_expr_with_annotated_params,
-                    parameters=chain_parameter_set,
+                    condition_parameters=chain_parameter_set,
+                    access_expr_parameters=yield_expr_params
                 ),
             )
 

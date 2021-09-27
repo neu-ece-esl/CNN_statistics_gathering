@@ -6,10 +6,10 @@ from typing import (
     Union,
     Set,
 )
-from sys import version
-from functools import partial
 from collections import Counter
 from StreamHelpers import ISLGeneratorPreprocessor
+
+
 @dataclass
 class IterationDomain:
     _vector: Tuple[str] = ()
@@ -26,17 +26,22 @@ class IterationDomain:
         if len(vector) != len(set(vector)):
             for iterator, count in Counter(vector).items():
                 if count > 1:
-                    raise SyntaxError(f"Duplicate iterator {iterator} in For loops")
+                    raise SyntaxError(
+                        f"Duplicate iterator {iterator} in For loops")
         for val in vector:
             if val == "_":
-                raise SyntaxError("Anonymous iterators not allowed in for loops")
+                raise SyntaxError(
+                    "Anonymous iterators not allowed in for loops")
         self._vector = vector
 
-    def to_abstract_repr(self, name, iteration_domain):
-        params = ISLGeneratorPreprocessor.preprocess_iterable(iteration_domain.parameters)
-        it_vector = ISLGeneratorPreprocessor.preprocess_iterable(iteration_domain.vector)
+    def to_abstract_repr(self, name):
+        params = ISLGeneratorPreprocessor.preprocess_iterable(
+            self.parameters)
+        it_vector = ISLGeneratorPreprocessor.preprocess_iterable(
+            self.vector)
 
-        bound_tuples = list(zip(iteration_domain.vector, iteration_domain.bounds))
+        bound_tuples = list(
+            zip(self.vector, self.bounds))
         bound_tuples_count = len(bound_tuples)
 
         bound_expr = ""
@@ -54,13 +59,13 @@ class IterationDomain:
                 bound_expr += "and"
 
         step_adjustment = ""
-        for idx, step in enumerate(iteration_domain.steps):
+        for idx, step in enumerate(self.steps):
             step_adjustment += "and"
-            step_adjustment += f" {iteration_domain.vector[idx]} mod {step} = 0 "
+            step_adjustment += f" {self.vector[idx]} mod {step} = 0 "
 
         structure = f"[{params}] -> {{ {name.upper()}[{it_vector}] : {bound_expr} {step_adjustment}}}"
 
-        return isl.BasicSet(structure)
+        return structure 
 
 
 @dataclass
@@ -69,17 +74,27 @@ class AccessMap:
     access_expr_with_annotated_parameters: str = ""
     condition: str = ""
     condition_with_annotated_parameters: str = ""
-    parameters: Set[str] = field(default_factory=set)
+    condition_parameters: Set[str] = field(default_factory=set)
+    access_expr_parameters: Set[str] = field(default_factory=set)
 
-    def to_abstract_repr(self, name, access_map):
-        params = ISLGeneratorPreprocessor.preprocess_iterable(access_map.parameters)
-        
-        if len(access_map.access_expr) != len(access_map.condition):
-            raise Exception("Number of conditions doesn't match number of access expressions")
+    def to_abstract_repr(self, it_vector, name='', access_array_name=''):
+        params = ISLGeneratorPreprocessor.preprocess_iterable(
+            self.condition_parameters)
+        it_vector = ISLGeneratorPreprocessor.preprocess_iterable(
+            it_vector)
 
-        for map, expr in zip(access_map.access_expr, access_map.condition):
-            pass 
+        access_expr = self.access_expr_with_annotated_parameters
+        condition = ISLGeneratorPreprocessor.preprocess_iterable(
+            self.condition)
+        structure = f"[{params}]->{{ {name.upper()}[{it_vector}] -> {access_array_name}[{access_expr}] : {condition}}}"
+
+        return structure 
+
 
 @dataclass
 class Invariant:
     name: str = ""
+
+    def eval(self, args, dependent_invariants):
+        #TODO: Implement
+        pass
