@@ -47,6 +47,9 @@ def example_func(c_ub, i_ub, j_ub, pe_channel, pe_group, pe, ifmap_dim):
                     yield i * ifmap_dim + j + pe_start_index_offset
 
 
+res = inspect.getgeneratorlocals(
+    example_func(1, ofmap_dim, ofmap_dim, 0, 0, 0, ifmap_dim, start_time=0)
+)["self"]
 
 tree = ast.parse(
     inspect.getsource(
