@@ -11,7 +11,7 @@ from StreamIntermediates import StreamTokens
 
 class StreamExtractor(astor.ExplicitNodeVisitor):
     @classmethod
-    def extract(cls, node, start_time=None, accessed_array=None):
+    def extract(cls, node):
         extractor = cls()
         extractor.visit(node)
         extractor.prune_orelse()

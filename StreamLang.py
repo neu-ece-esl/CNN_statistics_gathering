@@ -2,10 +2,13 @@
 # To add a new markdown cell, type ' [markdown]'
 
 
+from StreamGenerator import ISLGenerator
 import inspect
 import ast
 from StreamTemplate import stream
-
+from StreamExtractor import StreamExtractor
+from StreamParser import StreamParser
+from StreamGenerator import ISLGenerator
 
 # Layer Config
 ifmap_dim = 10
