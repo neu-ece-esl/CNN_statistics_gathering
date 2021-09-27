@@ -2,49 +2,9 @@
 # To add a new markdown cell, type ' [markdown]'
 
 
-from ast import Eq
-import islpy as isl
-from myhdl import (
-    block,
-    delay,
-    always_seq,
-    instance,
-    always,
-    Signal,
-    ResetSignal,
-    traceSignals,
-    now,
-)
-from dataclasses import dataclass, field
-from itertools import tee, product
-from typing import (
-    Callable,
-    Generator,
-    Dict,
-    List,
-    Tuple,
-    OrderedDict,
-    Optional,
-    Any,
-    Union,
-    Set,
-)
-from copy import deepcopy
-from abc import ABC, abstractmethod, abstractproperty
-import logging
-from sys import version
 import inspect
-from functools import partial
-from collections import Counter
-
-# import showast
 import ast
-import astor
-import re
-
-logging.basicConfig(level=logging.INFO)
-logging.info(version)
-
+from StreamTemplate import stream
 
 
 # Layer Config

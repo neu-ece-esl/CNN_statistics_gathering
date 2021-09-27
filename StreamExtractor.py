@@ -3,16 +3,11 @@ from typing import (
     Any,
 )
 from copy import deepcopy
-import logging
-from sys import version
-
-# import showast
+from Config import logging
 import ast
 import astor
 from StreamIntermediates import StreamTokens
 
-logging.basicConfig(level=logging.INFO)
-logging.info(version)
 
 class StreamExtractor(astor.ExplicitNodeVisitor):
     @classmethod
@@ -121,7 +116,8 @@ class StreamExtractor(astor.ExplicitNodeVisitor):
                 )
         if len(node.orelse) == 1:
             entry = node.orelse[0]
-            if_chain[-1].test = ast.UnaryOp(op=ast.Not(), operand=if_chain[-1].test)
+            if_chain[-1].test = ast.UnaryOp(op=ast.Not(),
+                                            operand=if_chain[-1].test)
             if isinstance(entry, ast.If):
                 self.visit_If(entry, if_chain)
             elif isinstance(entry, ast.Expr):
