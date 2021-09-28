@@ -1,10 +1,13 @@
 
+import token
 from StreamIntermediates import StreamTokens, IslIR
 from StreamParserPrimitives import AccessMap
 from StreamHelpers import NamedEntityAnnotator, NamedEntityExtractor
 import ast
 import astor
 import re
+
+
 class StreamParser:
 
     symbol_conversion_table = {r"==": "=", r"\n": "", r" +": " "}
@@ -49,20 +52,23 @@ class StreamParser:
 
     def parse_arguments(self, tokens: StreamTokens):
         if tokens.generator_args.vararg is not None:
-            raise SyntaxError(f"Varargs not allowed in stream template {self.ir.name}")
+            raise SyntaxError(
+                f"Varargs not allowed in stream template {self.ir.name}")
         if tokens.generator_args.kwarg is not None:
-            raise SyntaxError(f"Kwargs not allowed in stream template {self.ir.name}")
+            raise SyntaxError(
+                f"Kwargs not allowed in stream template {self.ir.name}")
 
         num_of_args_with_default_val = len(tokens.generator_args.defaults)
         if num_of_args_with_default_val != 0:
-            arg_list = tokens.generator_args.args[:(-num_of_args_with_default_val)]
+            defaultless_args = tokens.generator_args.args[:(
+                -num_of_args_with_default_val)]
         else:
-            arg_list = tokens.generator_args.args
+            defaultless_args = tokens.generator_args.args
 
-        for arg in arg_list:
+        for arg in defaultless_args:
             self.ir.arguments[arg.arg] = None
         for arg, default in zip(
-            reversed(arg_list), reversed(tokens.generator_args.defaults)
+            reversed(tokens.generator_args.args), reversed(tokens.generator_args.defaults)
         ):
             if not isinstance(default, ast.Constant) or not isinstance(
                 default.value, int
@@ -96,7 +102,9 @@ class StreamParser:
                         raise SyntaxError(
                             f"Invariant assignment '{target}' references '{var}' before its assignment"
                         )
-        self.ir.invariants = tuple(invariant_targets)
+        self.ir.invariants.targets = tuple(invariant_targets)
+        self.ir.invariants.expressions = tuple(
+            [assignment.value for assignment in tokens.invariant_assignments])
 
     def parse_access_maps(self, tokens: StreamTokens):
         for expr in tokens.yield_exprs:
@@ -111,19 +119,18 @@ class StreamParser:
                 ):
                     if (
                         param not in self.ir.arguments
-                        and param not in self.ir.invariants
+                        and param not in self.ir.invariants.targets
                     ):
                         raise SyntaxError(
                             f"Parameter {param} in expression \n'{astor.to_source(condition.test).strip()}'\nis not a stream argument nor an invariant"
                         )
                     chain_parameter_set.add(param)
 
-
-            yield_expr_params = set()            
+            yield_expr_params = set()
             for param in NamedEntityExtractor.extract(
                 yield_expr, ignore=self.ir.iteration_domain.vector
             ):
-                if param not in self.ir.arguments and param not in self.ir.invariants:
+                if param not in self.ir.arguments and param not in self.ir.invariants.targets:
                     raise SyntaxError(
                         f"Parameter {param} in expression \n'{astor.to_source(yield_expr.value).strip()}'\nis not a stream argument nor an invariant"
                     )
@@ -134,7 +141,8 @@ class StreamParser:
                 ast.BoolOp(
                     op=ast.And(),
                     values=[
-                        self.convert_access_map_condition_to_expr(condition.test)
+                        self.convert_access_map_condition_to_expr(
+                            condition.test)
                         for condition in condition_list
                     ],
                 )
@@ -184,7 +192,7 @@ class StreamParser:
                     if isinstance(arg, ast.Name):
                         if (
                             arg.id not in self.ir.arguments
-                            and arg not in self.ir.invariants
+                            and arg not in self.ir.invariants.targets
                         ):
                             raise SyntaxError(
                                 f"Argument '{arg.id}' in loop \n'{astor.to_source(loop).strip()}'\nis not a stream argument nor an invariant"

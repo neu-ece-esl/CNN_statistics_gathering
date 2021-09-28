@@ -5,13 +5,13 @@ from typing import (
     Union,
 )
 import ast
-from StreamParserPrimitives import IterationDomain, AccessMap, Invariant
+from StreamParserPrimitives import IterationDomain, AccessMap, Invariants
 @dataclass
 class IslIR:
+    invariants: Invariants = Invariants()
     name: str = ""
     iteration_domain: IterationDomain = IterationDomain()
     access_maps: Tuple[AccessMap] = ()
-    invariants: Tuple[Invariant] = ()
     arguments: Dict[str, Union[int, None]] = field(default_factory=dict)
 
 @dataclass

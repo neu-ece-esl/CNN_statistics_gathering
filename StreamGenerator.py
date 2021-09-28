@@ -1,13 +1,15 @@
 from StreamIntermediates import IslIR
-
+from typing import Tuple
 
 class ISLGenerator:
 
     @classmethod
-    def generate_concrete_repr(cls, ir: IslIR, accessed_array_name: str = ''):
+    def generate_concrete_repr(cls, arg_vals: Tuple, ir: IslIR, accessed_array_name: str = ''):
+        ir.invariants.eval(ir.arguments, arg_vals)
         for map in ir.access_maps:
             map_structure = map.to_abstract_repr(
                 ir.iteration_domain, ir.name, accessed_array_name)
+
             # colocate access expr paramameters to either stream arguments or invariants
             # colocate access conditional parameters to either stream arguments or invariants
             # Replace map access expr parameters with .format

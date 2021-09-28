@@ -1,4 +1,5 @@
 
+import astor
 import islpy as isl
 from dataclasses import dataclass, field
 from typing import (
@@ -8,6 +9,7 @@ from typing import (
 )
 from collections import Counter
 from StreamHelpers import ISLGeneratorPreprocessor
+import ast
 
 
 @dataclass
@@ -65,7 +67,7 @@ class IterationDomain:
 
         structure = f"[{params}] -> {{ {name.upper()}[{it_vector}] : {bound_expr} {step_adjustment}}}"
 
-        return structure 
+        return structure
 
 
 @dataclass
@@ -88,13 +90,51 @@ class AccessMap:
             self.condition)
         structure = f"[{params}]->{{ {name.upper()}[{it_vector}] -> {access_array_name}[{access_expr}] : {condition}}}"
 
-        return structure 
+        return structure
+
+
+function_evaluator = '''
+def invariant_evaluator():
+    return 1
+    
+result = invariant_evaluator()
+'''
 
 
 @dataclass
-class Invariant:
-    name: str = ""
+class Invariants:
+    targets: Tuple[str] = ()
+    expressions: Tuple = ()
 
-    def eval(self, args, dependent_invariants):
-        #TODO: Implement
-        pass
+    def eval(self, arg_names, arg_vals):
+        if len(self.targets) != len(self.expressions):
+            raise Exception(
+                "Mismatch between invariant targets and expressions")
+
+        if len(arg_names) != len(arg_vals):
+            raise Exception("Mismatch between arg names and arg vals")
+
+        evaluator_func_parse_tree = ast.parse(function_evaluator)
+        evauator_func = evaluator_func_parse_tree
+        evaluator_func_body = evauator_func.body[0]
+
+        for arg_name, arg_val in zip(arg_names, arg_vals):
+            evaluator_func_body.insert(0, ast.Assign(
+                targets=[ast.Name(id=f'{arg_name}')],
+                value=ast.Constant(value=arg_val, kind=None),
+                type_comment = None
+            ))
+
+        for target, expression in zip(self.targets, self.expressions):
+            evaluator_func_body.insert(0, ast.Assign(
+                targets=[ast.Name(id=f'{target}')],
+                value=expression,
+                type_comment = None
+            ))
+            
+        return_expression = evaluator_func_body.body[-1]
+        return_expression.value=ast.Tuple(elts=[ast.Name(id=target) for target in self.targets])
+
+        print(astor.dump_tree(evaluator_func_parse_tree))
+
+        print("TEST")
