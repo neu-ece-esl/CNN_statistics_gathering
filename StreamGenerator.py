@@ -5,7 +5,7 @@ class ISLGenerator:
 
     @classmethod
     def generate_concrete_repr(cls, arg_vals: Tuple, ir: IslIR, accessed_array_name: str = ''):
-        ir.invariants.eval(ir.arguments, arg_vals)
+        ir.invariants.eval(ir.arguments.keys(), arg_vals)
         for map in ir.access_maps:
             map_structure = map.to_abstract_repr(
                 ir.iteration_domain, ir.name, accessed_array_name)

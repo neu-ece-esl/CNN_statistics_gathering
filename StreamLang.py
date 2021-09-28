@@ -25,9 +25,10 @@ channel_chain_length = int(pe_count / pes_per_channel)
 
 
 @stream
-def example_func(c_ub, i_ub, j_ub, pe_channel, pe_group, pe, ifmap_dim=123):
+def example_func(c_ub, i_ub, j_ub, pe_channel, pe_group, pe, ifmap_dim):
     # Stream invariants
     pe_start_index_offset = pe_channel * (ifmap_dim ** 2) + pe_group * ifmap_dim + pe
+    pe_start_index_offset2 = 123 + pe_start_index_offset 
     # Dynamic computations
     for c in range(c_ub, i_ub, 2):
         for i in range(i_ub):
@@ -48,7 +49,7 @@ def example_func(c_ub, i_ub, j_ub, pe_channel, pe_group, pe, ifmap_dim=123):
 
 
 args = inspect.getgeneratorlocals(
-    example_func(1, ofmap_dim, ofmap_dim, 0, 0, 0,  start_time=0)
+    example_func(1, ofmap_dim, ofmap_dim, 1, 1, 1, ifmap_dim, start_time=0)
 )["gen_func_args"]
 
 tree = ast.parse(

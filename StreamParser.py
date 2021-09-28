@@ -60,8 +60,9 @@ class StreamParser:
 
         num_of_args_with_default_val = len(tokens.generator_args.defaults)
         if num_of_args_with_default_val != 0:
-            defaultless_args = tokens.generator_args.args[:(
-                -num_of_args_with_default_val)]
+            raise NotImplementedError("Stream functions cannot have default arguments")
+            # defaultless_args = tokens.generator_args.args[:(
+            #     -num_of_args_with_default_val)]
         else:
             defaultless_args = tokens.generator_args.args
 
