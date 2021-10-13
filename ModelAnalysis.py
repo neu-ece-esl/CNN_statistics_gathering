@@ -6,6 +6,29 @@ from typing import Tuple, List
 from copy import deepcopy
 from math import prod
 
+
+class StatsCounter:
+    def __init__(self):
+        self._dict = {}
+    def update(self, key, v = None):
+        if key not in self._dict:
+            self._dict[key] = 1
+        else:
+            self._dict[key] += v if v is not None else 1
+    def __iadd__(self, other):
+        if isinstance(other, StatsCounter):
+            for k, v in other.items():
+                self.update(k, v)
+        else:
+            raise TypeError("Can only add other StatsCounters to other StatsCounters")
+        return self
+    def __str__(self):
+        return self._dict.__str__()
+    def __repr__(self):
+        return self._dict.__repr__() 
+    def items(self):
+        return self._dict.items()
+
 @dataclass
 class LayerDimensions:
     kernel_size: Tuple[int, int]
@@ -30,7 +53,6 @@ class ModelStatCollector:
             input[0].size()), output_size=list(output[0].size()))
 
     def __attach_collection_hooks_to_model(self, model):
-
         for name, conv_layer in self.__get_next_conv_layers(model):
             layer_collector = partial(self.__extract_stats, name)
             self.hooks.append(
@@ -59,30 +81,32 @@ class ModelStatCollector:
 class ModelStatAnalyser:
     @ classmethod
     def get_kernel_stats(cls, model_stats):
-        kernel_size_counter = Counter()
+        kernel_size_counter = StatsCounter()
         stride_counter_dict = {}
         for layer in model_stats.values():
             kernel_size = layer.kernel_size
             stride = layer.stride
-            kernel_size_counter.update(str(kernel_size[0]))
-            if str(kernel_size[0]) not in stride_counter_dict:
-                stride_counter_dict[str(kernel_size[0])] = Counter()
-            stride_counter_dict[str(kernel_size[0])].update(str(stride[0]))
+            kernel_size_counter.update(f'{kernel_size[0]}')
+            if f'{kernel_size[0]}' not in stride_counter_dict:
+                stride_counter_dict[f'{kernel_size[0]}'] = StatsCounter()
+            stride_counter_dict[f'{kernel_size[0]}'].update(f'{stride[0]}')
         return kernel_size_counter
 
     @ classmethod
     def get_intermediate_layer_sizes(cls, model_stats):
         intermediate_layer_sizes = [
-            prod(layer.input_size) for layer in model_stats.values()]
+            (prod(layer.input_size), layer.input_size) for layer in model_stats.values()]
         intermediate_layer_sizes.append(
-            prod(list(model_stats.values())[-1].output_size))
+            (prod(list(model_stats.values())[-1].output_size), list(model_stats.values())[-1].output_size))
         return intermediate_layer_sizes
 
     @ classmethod
     def get_intermediate_layer_size_bounds(cls, model_stats):
         intermediate_layer_sizes = cls.get_intermediate_layer_sizes(model_stats)
-        return (max(intermediate_layer_sizes),
-                min(intermediate_layer_sizes))
+        max_layer_size = max(intermediate_layer_sizes, key=lambda elem: elem[0])
+        min_layer_size = min(intermediate_layer_sizes, key=lambda elem: elem[0])
+        return (max_layer_size,
+                min_layer_size)
 
     @ classmethod
     def get_ub_input_size(cls, model_stats):
@@ -93,11 +117,11 @@ class ModelStatAnalyser:
         in_channel_dict = {}
         for layer in model_stats.values():
             kernel_size = layer.kernel_size
-            if str(kernel_size[0]) not in in_channel_dict:
-                in_channel_dict[str(kernel_size[0])] = {}
-            if str(layer.input_size[1]) not in in_channel_dict[str(kernel_size[0])]:
-                in_channel_dict[str(kernel_size[0])][str(layer.input_size[1])] = 0
-            in_channel_dict[str(kernel_size[0])][str(layer.input_size[1])] += 1
+            if f'{kernel_size[0]}' not in in_channel_dict:
+                in_channel_dict[f'{kernel_size[0]}'] = {}
+            if f'{layer.input_size[1]}' not in in_channel_dict[f'{kernel_size[0]}']:
+                in_channel_dict[f'{kernel_size[0]}'][f'{layer.input_size[1]}'] = 0
+            in_channel_dict[f'{kernel_size[0]}'][f'{layer.input_size[1]}'] += 1
 
         return in_channel_dict
 
@@ -106,11 +130,11 @@ class ModelStatAnalyser:
         out_channel_dict = {}
         for layer in model_stats.values():
             kernel_size = layer.kernel_size
-            if str(kernel_size[0]) not in out_channel_dict:
-                out_channel_dict[str(kernel_size[0])] = {}
-            if str(layer.output_size[0]) not in out_channel_dict[str(kernel_size[0])]:
-                out_channel_dict[str(kernel_size[0])][str(layer.output_size[0])] = 0
-            out_channel_dict[str(kernel_size[0])][str(layer.output_size[0])] += 1
+            if f'{kernel_size[0]}' not in out_channel_dict:
+                out_channel_dict[f'{kernel_size[0]}'] = {}
+            if f'{layer.output_size[0]}' not in out_channel_dict[f'{kernel_size[0]}']:
+                out_channel_dict[f'{kernel_size[0]}'][f'{layer.output_size[0]}'] = 0
+            out_channel_dict[f'{kernel_size[0]}'][f'{layer.output_size[0]}'] += 1
 
         return out_channel_dict
 
@@ -120,9 +144,9 @@ class ModelStatAnalyser:
         for layer in model_stats.values():
             kernel_size = layer.kernel_size
             stride = layer.stride
-            if str(kernel_size[0]) not in stride_counter_dict:
-                stride_counter_dict[str(kernel_size[0])] = Counter()
-            stride_counter_dict[str(kernel_size[0])].update(str(stride[0]))
+            if f'{kernel_size[0]}' not in stride_counter_dict:
+                stride_counter_dict[f'{kernel_size[0]}'] = StatsCounter()
+            stride_counter_dict[f'{kernel_size[0]}'].update(f'{stride[0]}')
         return stride_counter_dict
 
     @ classmethod 
@@ -147,6 +171,7 @@ class ModelStatAnalyser:
                                     'stride': ModelStatAnalyser.get_stride_stats(model_stats),
                                     'in_channel': ModelStatAnalyser.get_in_channel_stats(model_stats),
                                     'filters': ModelStatAnalyser.get_filter_stats(model_stats),
+                                    'intermediate_layer_sizes': ModelStatAnalyser.get_intermediate_layer_sizes(model_stats),
                                     'intermediate_layer_bounds': ModelStatAnalyser.get_intermediate_layer_size_bounds(model_stats)}
         return stats_dict, raw_stats_dict
     
@@ -154,7 +179,7 @@ class ModelStatsAggregator:
     
     @ classmethod
     def get_aggregate_kernel_stats_as_percentages(cls, stats_dict):
-        aggregate_kernel_stats = Counter()
+        aggregate_kernel_stats = StatsCounter()
         for model, stats in stats_dict.items():
             aggregate_kernel_stats += stats['kernel']
         ksize, counts = zip(*[(ksize, count) for ksize, count in aggregate_kernel_stats.items()])
@@ -168,7 +193,7 @@ class ModelStatsAggregator:
         for model, stats in stats_dict.items():
             for kernel, counter in stats['stride'].items():
                 if kernel not in aggregate_stride_stats:
-                    aggregate_stride_stats[kernel] = Counter()
+                    aggregate_stride_stats[kernel] = StatsCounter()
                 aggregate_stride_stats[kernel] += counter
         return aggregate_stride_stats
     
