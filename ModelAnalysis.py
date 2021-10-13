@@ -166,14 +166,14 @@ class ModelStatAnalyser:
                 model_stats = ModelStatCollector.collect_stats_from_model(model, input_batch)
                 
             model.to('cpu')
-            raw_stats_dict[model_name] = model_stats
             stats_dict[model_name] = {'kernel': ModelStatAnalyser.get_kernel_stats(model_stats),
                                     'stride': ModelStatAnalyser.get_stride_stats(model_stats),
                                     'in_channel': ModelStatAnalyser.get_in_channel_stats(model_stats),
                                     'filters': ModelStatAnalyser.get_filter_stats(model_stats),
                                     'intermediate_layer_sizes': ModelStatAnalyser.get_intermediate_layer_sizes(model_stats),
-                                    'intermediate_layer_bounds': ModelStatAnalyser.get_intermediate_layer_size_bounds(model_stats)}
-        return stats_dict, raw_stats_dict
+                                    'intermediate_layer_bounds': ModelStatAnalyser.get_intermediate_layer_size_bounds(model_stats),
+                                    'raw_stats': model_stats}
+        return stats_dict
     
 class ModelStatsAggregator:
     
