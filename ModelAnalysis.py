@@ -22,6 +22,8 @@ class StatsCounter:
         else:
             raise TypeError("Can only add other StatsCounters to other StatsCounters")
         return self
+    def __getitem__(self, key):
+        return self._dict[key]
     def __str__(self):
         return self._dict.__str__()
     def __repr__(self):
@@ -158,7 +160,6 @@ class ModelStatAnalyser:
             if ssd_input_batch is not None:
                 ssd_input_batch = ssd_input_batch.to('cuda')
         for model_name, model in model_dict.items():
-            print('Analysing {}'.format(model_name))
             model.to('cuda')
             if model_name == 'ssd' and ssd_input_batch is not None:
                 model_stats = ModelStatCollector.collect_stats_from_model(model, ssd_input_batch)
