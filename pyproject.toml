@@ -32,6 +32,12 @@ pylama = "^7.7.1"
 black = "^21.9b0"
 pylint = "^2.11.1"
 asteval = "^0.9.25"
+ManimPango = "^0.3.1"
+manimgl = "^1.1.0"
+efficientnet-pytorch = "^0.7.1"
+timm = "^0.4.12"
+inplace-abn = "^1.1.0"
+ipykernel = "^6.4.1"
 
 [tool.poetry.dev-dependencies]
 
