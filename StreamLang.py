@@ -48,6 +48,8 @@ def example_func(c_ub, i_ub, j_ub, pe_channel, pe_group, pe, ifmap_dim):
                     yield i * ifmap_dim + j + pe_start_index_offset
 
 
+
+
 args = inspect.getgeneratorlocals(
     example_func(1, ofmap_dim, ofmap_dim, 1, 1, 1, ifmap_dim, start_time=0)
 )["gen_func_args"]
